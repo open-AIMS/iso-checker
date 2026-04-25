@@ -9,7 +9,7 @@
   },
   "keywords": ["iso19115", "metadata", "geonetwork"],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "typescript": "^6.0.3"
   }
