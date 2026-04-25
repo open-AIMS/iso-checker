@@ -1,0 +1,16 @@
+{
+  "name": "iso-checker",
+  "version": "1.0.0",
+  "description": "ISO 19115-3 Metadata Checker — PID encoding validator",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "keywords": ["iso19115", "metadata", "geonetwork"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
