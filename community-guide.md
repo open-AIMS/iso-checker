@@ -517,219 +517,123 @@ Figure 13. Example DataCite landing page for a dataset DOI, showing metadata fie
 
 Example XML fragment for a dataset DOI in ISO19115-3.
 
-**mdb:MD_Metadata/mdb:identificationInfo/mri:MD_DataIdentification/mri:citation/cit:CI_Citation:**
+`mdb:MD_Metadata / mdb:identificationInfo / mri:MD_DataIdentification / mri:citation / cit:CI_Citation:`
 
-\<cit:identifier\>
-
-\<mcc:MD_Identifier\>
-
-\<mcc:code\>
-
-\<gcx:Anchor xlink:href=**"https://doi.org/** **10.25959/BVJ7-D984"**\>**10.25959/BVJ7-D984**\</gcx:Anchor\>
-
-\</mcc:code\>
-
-\<mcc:codeSpace\>
-
-\<gco:CharacterString\>**doi.org**\</gco:CharacterString\>
-
-\</mcc:codeSpace\>
-
-\<mcc:description\>
-
-\<gco:CharacterString\>**Digital Object Identifier (DOI)**\</gco:CharacterString\>
-
-\</mcc: description \>
-
-\</mcc:MD_Identifier\>
-
-\</cit:identifier\>
+```xml
+<cit:identifier>
+  <mcc:MD_Identifier>
+    <mcc:code>
+      <gcx:Anchor xlink:href="https://doi.org/10.25959/BVJ7-D984">10.25959/BVJ7-D984</gcx:Anchor>
+    </mcc:code>
+    <mcc:codeSpace>
+      <gco:CharacterString>doi.org</gco:CharacterString>
+    </mcc:codeSpace>
+    <mcc:description>
+      <gco:CharacterString>Digital Object Identifier (DOI)</gco:CharacterString>
+    </mcc:description>
+  </mcc:MD_Identifier>
+</cit:identifier>
+```
 
 # Appendix B: XML for RORs and ORCIDs in ISO records
 
 Example XML fragment corresponding to a ‘Principal investigator’ in ISO19115-3. Email addresses are intentionally excluded for ‘Contributors’. Minimal address information is recorded. The address information is associated with the *individual*, rather than the *organisation*.
 
-**mdb:MD_Metadata/mdb:identificationInfo/mri:MD_DataIdentification/mri:citation/cit:CI_Citation…**
-
-\<cit:citedResponsibleParty\>
-
-\<cit:CI_Responsibility\>
-
-\<cit:role\>
-
-\<cit:CI_RoleCode codeList=**"http://standards.iso.org/iso/19115/resources/Codelists/cat/codelists.xml#CI_RoleCode"**
-
-codeListValue=**"principalInvestigator"**/\>
-
-\</cit:role\>
-
-\<cit:party\>
-
-\<cit:CI_Organisation\>
-
-\<cit:name\>
-
-\<gco:CharacterString\>**Australian Institute of Marine Science**\</gco:CharacterString\>
-
-\</cit:name\>
-
-\<cit:contactInfo\>
-
-\<cit:CI_Contact\>
-
-\<cit:address/\>
-
-\<cit:onlineResource\>
-
-\<cit:CI_OnlineResource\>
-
-\<cit:linkage\>
-
-\<gco:CharacterString\>**https://ror.org/03x57gn41**\</gco:CharacterString\>
-
-\</cit:linkage\>
-
-\<cit:protocol\>
-
-\<gco:CharacterString\>**WWW:LINK-1.0-http--link**\</gco:CharacterString\>
-
-\</cit:protocol\>
-
-\<cit:name\>
-
-\<gco:CharacterString\>**ROR ID**\</gco:CharacterString\>
-
-\</cit:name\>
-
-\</cit:CI_OnlineResource\>
-
-\</cit:onlineResource\>
-
-\</cit:CI_Contact\>
-
-\</cit:contactInfo\>
-
-\<cit:partyIdentifier\>
-
-\<mcc:MD_Identifier\>
-
-\<mcc:code\>
-
-\<gcx:Anchor xlink:href=**"https://ror.org/03x57gn41"**\>**03x57gn41**\</gcx:Anchor\>
-
-\</mcc:code\>
-
-\<mcc:codeSpace\>
-
-\<gco:CharacterString\>**ror.org**\</gco:CharacterString\>
-
-\</mcc:codeSpace\>
-
-\</mcc:MD_Identifier\>
-
-\</cit:partyIdentifier\>
-
-\<cit:individual\>
-
-\<cit:CI_Individual\>
-
-\<cit:name\>
-
-\<gco:CharacterString\>**Lawrey, Eric**\</gco:CharacterString\>
-
-\</cit:name\>
-
-\<cit:contactInfo\>
-
-\<cit:CI_Contact\>
-
-\<cit:address\>
-
-\<cit:CI_Address\>
-
-\<cit:administrativeArea\>
-
-\<gco:CharacterString\>**Queensland**\</gco:CharacterString\>
-
-\</cit:administrativeArea\>
-
-\<cit:country\>
-
-\<gco:CharacterString\>**Australia**\</gco:CharacterString\>
-
-\</cit:country\>
-
-\<cit:electronicMailAddress\>
-
-\<gco:CharacterString\>**e.lawrey@aims.gov.au**\</gco:CharacterString\>
-
-\</cit:electronicMailAddress\>
-
-\</cit:CI_Address\>
-
-\</cit:address\>
-
-\<cit:onlineResource\>
-
-\<cit:CI_OnlineResource\>
-
-\<cit:linkage\>
-
-\<gco:CharacterString\>**https://orcid.org/0000-0002-3144-3475**\</gco:CharacterString\>
-
-\</cit:linkage\>
-
-\<cit:protocol\>
-
-\<gco:CharacterString\>**WWW:LINK-1.0-http--link**\</gco:CharacterString\>
-
-\</cit:protocol\>
-
-\<cit:name\>
-
-\<gco:CharacterString\>**ORCID**\</gco:CharacterString\>
-
-\</cit:name\>
-
-\</cit:CI_OnlineResource\>
-
-\</cit:onlineResource\>
-
-\</cit:CI_Contact\>
-
-\</cit:contactInfo\>
-
-\<cit:partyIdentifier\>
-
-\<mcc:MD_Identifier\>
-
-\<mcc:code\>
-
-\<gcx:Anchor xlink:href=**"https://orcid.org/0000-0002-3144-3475"**\>**0000-0002-3144-3475**\</gcx:Anchor\>
-
-\</mcc:code\>
-
-\<mcc:codeSpace\>
-
-\<gco:CharacterString\>**orcid.org**\</gco:CharacterString\>
-
-\</mcc:codeSpace\>
-
-\</mcc:MD_Identifier\>
-
-\</cit:partyIdentifier\>
-
-\</cit:CI_Individual\>
-
-\</cit:individual\>
-
-\</cit:CI_Organisation\>
-
-\</cit:party\>
-
-\</cit:CI_Responsibility\>
-
-\</cit:citedResponsibleParty\>
+`mdb:MD_Metadata / mdb:identificationInfo / mri:MD_DataIdentification / mri:citation / cit:CI_Citation:`
+
+```xml
+<cit:citedResponsibleParty>
+  <cit:CI_Responsibility>
+    <cit:role>
+      <cit:CI_RoleCode
+        codeList="http://standards.iso.org/iso/19115/resources/Codelists/cat/codelists.xml#CI_RoleCode"
+        codeListValue="principalInvestigator" />
+    </cit:role>
+    <cit:party>
+      <cit:CI_Organisation>
+        <cit:name>
+          <gco:CharacterString>Australian Institute of Marine Science</gco:CharacterString>
+        </cit:name>
+        <cit:contactInfo>
+          <cit:CI_Contact>
+            <cit:address />
+            <cit:onlineResource>
+              <cit:CI_OnlineResource>
+                <cit:linkage>
+                  <gco:CharacterString>https://ror.org/03x57gn41</gco:CharacterString>
+                </cit:linkage>
+                <cit:protocol>
+                  <gco:CharacterString>WWW:LINK-1.0-http--link</gco:CharacterString>
+                </cit:protocol>
+                <cit:name>
+                  <gco:CharacterString>ROR ID</gco:CharacterString>
+                </cit:name>
+              </cit:CI_OnlineResource>
+            </cit:onlineResource>
+          </cit:CI_Contact>
+        </cit:contactInfo>
+        <cit:partyIdentifier>
+          <mcc:MD_Identifier>
+            <mcc:code>
+              <gcx:Anchor xlink:href="https://ror.org/03x57gn41">03x57gn41</gcx:Anchor>
+            </mcc:code>
+            <mcc:codeSpace>
+              <gco:CharacterString>ror.org</gco:CharacterString>
+            </mcc:codeSpace>
+          </mcc:MD_Identifier>
+        </cit:partyIdentifier>
+        <cit:individual>
+          <cit:CI_Individual>
+            <cit:name>
+              <gco:CharacterString>Lawrey, Eric</gco:CharacterString>
+            </cit:name>
+            <cit:contactInfo>
+              <cit:CI_Contact>
+                <cit:address>
+                  <cit:CI_Address>
+                    <cit:administrativeArea>
+                      <gco:CharacterString>Queensland</gco:CharacterString>
+                    </cit:administrativeArea>
+                    <cit:country>
+                      <gco:CharacterString>Australia</gco:CharacterString>
+                    </cit:country>
+                    <cit:electronicMailAddress>
+                      <gco:CharacterString>e.lawrey@aims.gov.au</gco:CharacterString>
+                    </cit:electronicMailAddress>
+                  </cit:CI_Address>
+                </cit:address>
+                <cit:onlineResource>
+                  <cit:CI_OnlineResource>
+                    <cit:linkage>
+                      <gco:CharacterString>https://orcid.org/0000-0002-3144-3475</gco:CharacterString>
+                    </cit:linkage>
+                    <cit:protocol>
+                      <gco:CharacterString>WWW:LINK-1.0-http--link</gco:CharacterString>
+                    </cit:protocol>
+                    <cit:name>
+                      <gco:CharacterString>ORCID</gco:CharacterString>
+                    </cit:name>
+                  </cit:CI_OnlineResource>
+                </cit:onlineResource>
+              </cit:CI_Contact>
+            </cit:contactInfo>
+            <cit:partyIdentifier>
+              <mcc:MD_Identifier>
+                <mcc:code>
+                  <gcx:Anchor xlink:href="https://orcid.org/0000-0002-3144-3475">0000-0002-3144-3475</gcx:Anchor>
+                </mcc:code>
+                <mcc:codeSpace>
+                  <gco:CharacterString>orcid.org</gco:CharacterString>
+                </mcc:codeSpace>
+              </mcc:MD_Identifier>
+            </cit:partyIdentifier>
+          </cit:CI_Individual>
+        </cit:individual>
+      </cit:CI_Organisation>
+    </cit:party>
+  </cit:CI_Responsibility>
+</cit:citedResponsibleParty>
+```
 
 # Appendix C: XML for RAiDs in ISO records
 
@@ -737,37 +641,23 @@ codeListValue=**"principalInvestigator"**/\>
 
 The project's RAiD is recorded as a cit:identifier element within the project's citation (mri:citation/cit:CI_Citation). It sits alongside other identifiers such as the DOI. The identifier code is the RAiD handle (e.g. 10.82210/a611d299), the code space is raid.org, and the description is "Project RAiD". The code is rendered as a gcx:Anchor element with an xlink:href pointing to the full RAiD URL.
 
-**mdb:MD_Metadata/mdb:identificationInfo/mri:MD_DataIdentification/mri:citation/cit:CI_Citation…**
+`mdb:MD_Metadata / mdb:identificationInfo / mri:MD_DataIdentification / mri:citation / cit:CI_Citation:`
 
-\<cit:identifier\>
-
-\<cit:identifier\>
-
-\<mcc:MD_Identifier\>
-
-\<mcc:code\>
-
-\<gcx:Anchor xlink:href="**https://raid.org/10.82210/7fe34398**"\>**10.82210/7fe34398**\</gcx:Anchor\>
-
-\</mcc:code\>
-
-\<mcc:codeSpace\>
-
-\<gco:CharacterString\>**raid.org**\</gco:CharacterString\>
-
-\</mcc:codeSpace\>
-
-\<mcc:description\>
-
-\<gco:CharacterString\>**Project RAiD**\</gco:CharacterString\>
-
-\</mcc:description\>
-
-\</mcc:MD_Identifier\>
-
-\</cit:identifier\>
-
-\</cit:identifier\>
+```xml
+<cit:identifier>
+  <mcc:MD_Identifier>
+    <mcc:code>
+      <gcx:Anchor xlink:href="https://raid.org/10.82210/7fe34398">10.82210/7fe34398</gcx:Anchor>
+    </mcc:code>
+    <mcc:codeSpace>
+      <gco:CharacterString>raid.org</gco:CharacterString>
+    </mcc:codeSpace>
+    <mcc:description>
+      <gco:CharacterString>Project RAiD</gco:CharacterString>
+    </mcc:description>
+  </mcc:MD_Identifier>
+</cit:identifier>
+```
 
 #### RAiD encoded in dataset metadata record
 
@@ -775,64 +665,41 @@ The project's RAiD is recorded in a dataset metadata record as an mri:associated
 
 **Note**: GeoNetwork's batch editing API ('gn_add') is schema-aware and automatically inserts the element at the correct position according to the XSD sequence order. There is no need to manually calculate the insertion point.
 
-**mdb:MD_Metadata/mdb:identificationInfo/mri:MD_DataIdentification…**
+`mdb:MD_Metadata / mdb:identificationInfo / mri:MD_DataIdentification:`
 
-\<mri:associatedResource\>
-
-\<mri:MD_AssociatedResource\>
-
-\<mri:associationType\>
-
-\<mri:DS_AssociationTypeCode codeList="http://standards.iso.org/iso/19115/resources/Codelists/cat/codelists.xml#DS_AssociationTypeCode" codeListValue="**dependency**" /\>
-
-\</mri:associationType\>
-
-\<mri:initiativeType\>
-
-\<mri:DS_InitiativeTypeCode codeList="http://standards.iso.org/iso/19115/resources/Codelists/cat/codelists.xml#DS_InitiativeTypeCode" codeListValue="**project**" /\>
-
-\</mri:initiativeType\>
-
-\<mri:metadataReference\>
-
-\<cit:CI_Citation\>
-
-\<cit:title\>
-
-\<gco:CharacterString\> **NESP MaC Project 3.17 - Locating Unidentified Reef and Habitat Features in the Northern Australian Seascape, 2023-2025 (AIMS, UQ)**\</gco:CharacterString\>
-
-\</cit:title\>
-
-\<cit:identifier\>
-
-\<mcc:MD_Identifier\>
-
-\<mcc:code\>
-
-\<gcx:Anchor xlink:href="**https://raid.org/10.82210/dbdfe884**"\>**10.82210/dbdfe884**\</gcx:Anchor\>
-
-\</mcc:code\>
-
-\<mcc:codeSpace\>
-
-\<gco:CharacterString\>**raid.org**\</gco:CharacterString\>
-
-\</mcc:codeSpace\>
-
-\<mcc:description\>
-
-\<gco:CharacterString\>**Project RAiD**\</gco:CharacterString\>
-
-\</mcc:description\>
-
-\</mcc:MD_Identifier\>
-
-\</cit:identifier\>
-
-\</cit:CI_Citation\>
-
-\</mri:metadataReference\>
-
-\</mri:MD_AssociatedResource\>
-
-\</mri:associatedResource\>
+```xml
+<mri:associatedResource>
+  <mri:MD_AssociatedResource>
+    <mri:associationType>
+      <mri:DS_AssociationTypeCode
+        codeList="http://standards.iso.org/iso/19115/resources/Codelists/cat/codelists.xml#DS_AssociationTypeCode"
+        codeListValue="dependency" />
+    </mri:associationType>
+    <mri:initiativeType>
+      <mri:DS_InitiativeTypeCode
+        codeList="http://standards.iso.org/iso/19115/resources/Codelists/cat/codelists.xml#DS_InitiativeTypeCode"
+        codeListValue="project" />
+    </mri:initiativeType>
+    <mri:metadataReference>
+      <cit:CI_Citation>
+        <cit:title>
+          <gco:CharacterString>NESP MaC Project 3.17 - Locating Unidentified Reef and Habitat Features in the Northern Australian Seascape, 2023-2025 (AIMS, UQ)</gco:CharacterString>
+        </cit:title>
+        <cit:identifier>
+          <mcc:MD_Identifier>
+            <mcc:code>
+              <gcx:Anchor xlink:href="https://raid.org/10.82210/dbdfe884">10.82210/dbdfe884</gcx:Anchor>
+            </mcc:code>
+            <mcc:codeSpace>
+              <gco:CharacterString>raid.org</gco:CharacterString>
+            </mcc:codeSpace>
+            <mcc:description>
+              <gco:CharacterString>Project RAiD</gco:CharacterString>
+            </mcc:description>
+          </mcc:MD_Identifier>
+        </cit:identifier>
+      </cit:CI_Citation>
+    </mri:metadataReference>
+  </mri:MD_AssociatedResource>
+</mri:associatedResource>
+```
