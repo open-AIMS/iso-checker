@@ -856,13 +856,29 @@ export function renderBatchReport(
     totalCounts.info += c.info;
   }
 
+  // Record-level severity counts (worst severity per record)
+  const recordCounts = { pass: 0, warning: 0, error: 0 };
+  const reportSeverities: Array<'pass' | 'warning' | 'error'> = [];
+  for (const r of reports) {
+    const worst = getWorstSeverityForReport(r);
+    const category = worst === 'error' ? 'error' : worst === 'warning' ? 'warning' : 'pass';
+    reportSeverities.push(category);
+    recordCounts[category]++;
+  }
+
   left.innerHTML = `
     <div class="batch-summary-header">
       <strong>${reports.length} records checked</strong>
       <div class="summary-counts">
-        <span class="count-pass">${SEVERITY_ICONS.pass} ${totalCounts.pass}</span>
+        Tests: <span class="count-pass">${SEVERITY_ICONS.pass} ${totalCounts.pass}</span>
         <span class="count-warning">${SEVERITY_ICONS.warning} ${totalCounts.warning}</span>
         <span class="count-error">${SEVERITY_ICONS.error} ${totalCounts.error}</span>
+      </div>
+      <div class="record-filter-counts">
+        Records:
+        <label class="filter-checkbox"><input type="checkbox" data-filter="pass" checked /> <span class="count-pass">${SEVERITY_ICONS.pass} ${recordCounts.pass}</span></label>
+        <label class="filter-checkbox"><input type="checkbox" data-filter="warning" checked /> <span class="count-warning">${SEVERITY_ICONS.warning} ${recordCounts.warning}</span></label>
+        <label class="filter-checkbox"><input type="checkbox" data-filter="error" checked /> <span class="count-error">${SEVERITY_ICONS.error} ${recordCounts.error}</span></label>
       </div>
     </div>
     <div class="batch-record-list"></div>
@@ -872,7 +888,10 @@ export function renderBatchReport(
   for (let i = 0; i < reports.length; i++) {
     const r = reports[i];
     const worst = getWorstSeverityForReport(r);
+    const filterCategory = reportSeverities[i];
     const row = el('div', `batch-record-row ${SEVERITY_CLASSES[worst]}`);
+    row.dataset.index = String(i);
+    row.dataset.severity = filterCategory;
     row.innerHTML = `
       <span class="check-icon">${SEVERITY_ICONS[worst]}</span>
       <span class="batch-record-title">${escapeHtml((r.record.title ?? '(untitled)').substring(0, 50))}</span>
@@ -884,6 +903,39 @@ export function renderBatchReport(
     });
     list.appendChild(row);
   }
+
+  // Filter checkboxes — toggle record visibility by severity
+  const filterCheckboxes = left.querySelectorAll<HTMLInputElement>('.record-filter-counts input[type="checkbox"]');
+  filterCheckboxes.forEach(cb => {
+    cb.addEventListener('change', () => {
+      const visibleSeverities = new Set<string>();
+      filterCheckboxes.forEach(fcb => {
+        if (fcb.checked) visibleSeverities.add(fcb.dataset.filter!);
+      });
+
+      let activeHidden = false;
+      const rows = list.querySelectorAll<HTMLElement>('.batch-record-row');
+      rows.forEach(row => {
+        const show = visibleSeverities.has(row.dataset.severity!);
+        row.style.display = show ? '' : 'none';
+        if (!show && row.classList.contains('active')) {
+          activeHidden = true;
+          row.classList.remove('active');
+        }
+      });
+
+      // If the active record was hidden, select the first visible record
+      if (activeHidden) {
+        for (const row of Array.from(rows)) {
+          if (row.style.display !== 'none') {
+            row.classList.add('active');
+            onSelect(parseInt(row.dataset.index!, 10));
+            break;
+          }
+        }
+      }
+    });
+  });
 
   container.appendChild(left);
   container.appendChild(right);
