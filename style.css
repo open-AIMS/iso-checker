@@ -285,6 +285,16 @@ body {
   margin-top: 8px;
 }
 
+.batch-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  color: #555;
+}
+
 /* --- Results area --- */
 
 .results-area {

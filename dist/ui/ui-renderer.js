@@ -166,6 +166,11 @@ export function renderMainInterface(container, app) {
           <thead><tr><th><input type="checkbox" id="batch-select-all" /></th><th>Title</th><th>Type</th><th>UUID</th></tr></thead>
           <tbody></tbody>
         </table>
+        <div id="batch-pagination" class="batch-pagination" style="display:none">
+          <button id="batch-page-prev" class="btn btn-small" disabled>← Previous</button>
+          <span id="batch-page-info"></span>
+          <button id="batch-page-next" class="btn btn-small" disabled>Next →</button>
+        </div>
         <div class="batch-actions">
           <span id="batch-selected-count">0 selected</span>
           <button id="batch-run" class="btn btn-primary" disabled>Run Checks</button>
@@ -472,6 +477,18 @@ export function renderSettingsPanel(container, settings, onSave, onClose) {
     </section>
 
     <section class="settings-section">
+      <h3>Search Results Page Size</h3>
+      <select id="settings-page-size" class="input-field">
+        <option value="25" ${settings.searchPageSize === 25 ? 'selected' : ''}>25</option>
+        <option value="50" ${settings.searchPageSize === 50 ? 'selected' : ''}>50</option>
+        <option value="100" ${settings.searchPageSize === 100 ? 'selected' : ''}>100</option>
+        <option value="250" ${settings.searchPageSize === 250 ? 'selected' : ''}>250</option>
+        <option value="500" ${settings.searchPageSize === 500 ? 'selected' : ''}>500</option>
+      </select>
+      <p class="help-text">Number of records returned per CSW search page.</p>
+    </section>
+
+    <section class="settings-section">
       <h3>Rate Limiting</h3>
       <select id="settings-rate-limit" class="input-field">
         <option value="500" ${settings.rateLimitMs === 500 ? 'selected' : ''}>0.5 seconds</option>
@@ -499,6 +516,7 @@ export function renderSettingsPanel(container, settings, onSave, onClose) {
         });
         settings.apiValidationEnabled = panel.querySelector('#settings-api-toggle').checked;
         settings.rateLimitMs = parseInt(panel.querySelector('#settings-rate-limit').value, 10);
+        settings.searchPageSize = parseInt(panel.querySelector('#settings-page-size').value, 10);
         onSave(settings);
     };
     // Render existing catalogues
@@ -601,51 +619,116 @@ export function renderSettingsPanel(container, settings, onSave, onClose) {
     });
 }
 // --- Batch results ---
-export function renderBatchSearchResults(container, records, totalMatched) {
+// Cross-page selected UUIDs — maintained across pagination
+let batchSelectedUuids = new Set();
+export function renderBatchSearchResults(container, records, totalMatched, startPosition, pageSize, onPageChange) {
     const area = container.querySelector('#batch-results-area');
     area.style.display = 'block';
+    const currentPage = Math.floor((startPosition - 1) / pageSize) + 1;
+    const totalPages = Math.ceil(totalMatched / pageSize);
+    const rangeStart = startPosition;
+    const rangeEnd = Math.min(startPosition + records.length - 1, totalMatched);
     const status = area.querySelector('#batch-search-status');
-    status.textContent = `Found ${totalMatched} records. Showing first ${records.length}.`;
+    status.textContent = `Found ${totalMatched} records. Showing ${rangeStart}–${rangeEnd}.`;
+    // On first page, auto-select all visible records
+    if (startPosition === 1) {
+        batchSelectedUuids = new Set(records.map(r => r.identifier));
+    }
+    else {
+        // New page records default to selected
+        for (const rec of records) {
+            batchSelectedUuids.add(rec.identifier);
+        }
+    }
     const tbody = area.querySelector('#batch-table tbody');
     tbody.innerHTML = '';
     for (const rec of records) {
+        const isChecked = batchSelectedUuids.has(rec.identifier);
         const tr = document.createElement('tr');
         tr.innerHTML = `
-      <td><input type="checkbox" class="batch-checkbox" data-uuid="${escapeHtml(rec.identifier)}" checked /></td>
+      <td><input type="checkbox" class="batch-checkbox" data-uuid="${escapeHtml(rec.identifier)}" ${isChecked ? 'checked' : ''} /></td>
       <td>${escapeHtml(rec.title)}</td>
       <td>${escapeHtml(rec.type)}</td>
       <td class="uuid-cell">${escapeHtml(rec.identifier)}</td>
     `;
         tbody.appendChild(tr);
     }
+    // Pagination controls
+    const paginationEl = area.querySelector('#batch-pagination');
+    if (totalPages > 1) {
+        paginationEl.style.display = 'flex';
+        const prevBtn = area.querySelector('#batch-page-prev');
+        const nextBtn = area.querySelector('#batch-page-next');
+        const pageInfo = area.querySelector('#batch-page-info');
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        prevBtn.disabled = currentPage <= 1;
+        nextBtn.disabled = currentPage >= totalPages;
+        // Clone and replace to remove old listeners
+        const newPrev = prevBtn.cloneNode(true);
+        const newNext = nextBtn.cloneNode(true);
+        prevBtn.replaceWith(newPrev);
+        nextBtn.replaceWith(newNext);
+        newPrev.addEventListener('click', () => {
+            syncPageSelections(area);
+            onPageChange(startPosition - pageSize);
+        });
+        newNext.addEventListener('click', () => {
+            syncPageSelections(area);
+            onPageChange(startPosition + pageSize);
+        });
+    }
+    else {
+        paginationEl.style.display = 'none';
+    }
     updateBatchCount(area);
-    // Select all
-    area.querySelector('#batch-select-all')?.addEventListener('change', (e) => {
+    // Select all (current page only)
+    const selectAllCb = area.querySelector('#batch-select-all');
+    const newSelectAll = selectAllCb.cloneNode(true);
+    selectAllCb.replaceWith(newSelectAll);
+    newSelectAll.addEventListener('change', (e) => {
         const checked = e.target.checked;
-        area.querySelectorAll('.batch-checkbox').forEach(cb => cb.checked = checked);
+        area.querySelectorAll('.batch-checkbox').forEach(cb => {
+            cb.checked = checked;
+            const uuid = cb.dataset.uuid;
+            if (checked)
+                batchSelectedUuids.add(uuid);
+            else
+                batchSelectedUuids.delete(uuid);
+        });
         updateBatchCount(area);
     });
     area.querySelectorAll('.batch-checkbox').forEach(cb => {
-        cb.addEventListener('change', () => updateBatchCount(area));
+        cb.addEventListener('change', () => {
+            const checkbox = cb;
+            const uuid = cb.dataset.uuid;
+            if (checkbox.checked)
+                batchSelectedUuids.add(uuid);
+            else
+                batchSelectedUuids.delete(uuid);
+            updateBatchCount(area);
+        });
+    });
+}
+/** Sync current page checkbox state into the cross-page selection set */
+function syncPageSelections(area) {
+    area.querySelectorAll('.batch-checkbox').forEach(cb => {
+        const uuid = cb.dataset.uuid;
+        if (cb.checked)
+            batchSelectedUuids.add(uuid);
+        else
+            batchSelectedUuids.delete(uuid);
     });
 }
 function updateBatchCount(area) {
-    const checked = area.querySelectorAll('.batch-checkbox:checked').length;
     const countEl = area.querySelector('#batch-selected-count');
     if (countEl)
-        countEl.textContent = `${checked} selected`;
+        countEl.textContent = `${batchSelectedUuids.size} selected`;
     const runBtn = area.querySelector('#batch-run');
     if (runBtn)
-        runBtn.disabled = checked === 0;
+        runBtn.disabled = batchSelectedUuids.size === 0;
 }
-export function getSelectedBatchUuids(container) {
-    const uuids = [];
-    container.querySelectorAll('.batch-checkbox:checked').forEach(cb => {
-        const uuid = cb.dataset.uuid;
-        if (uuid)
-            uuids.push(uuid);
-    });
-    return uuids;
+export function getSelectedBatchUuids(_container) {
+    return Array.from(batchSelectedUuids);
 }
 // --- Batch report view ---
 export function renderBatchReport(container, reports, condensedGuide, onSelect) {

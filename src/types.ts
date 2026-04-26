@@ -226,6 +226,7 @@ export interface AppSettings {
   disabledRules: string[];
   apiValidationEnabled: boolean;
   rateLimitMs: number;
+  searchPageSize: number;
   setupComplete: boolean;
 }
 

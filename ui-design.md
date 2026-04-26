@@ -60,8 +60,11 @@ Three tabs for different input methods. Only one is active at a time.
 - Two sub-areas side by side:
   - **Search:** Search term field, resource type dropdown (All/Dataset/Project/Program), [Search] button
   - **UUID list:** Multi-line text area for pasting UUIDs (one per line), [Fetch Records] button
-- Below the input: search results table showing Title, Type, UUID columns with checkboxes
-- [Select All] / [Deselect All] buttons, selected count, [Run Checks] button
+- Below the input: paginated search results table showing Title, Type, UUID columns with checkboxes
+  - Pagination controls: [Previous page] / [Next page] buttons, current page indicator (e.g. "Page 1 of 4"), total matched count
+  - Pages are fetched on demand from the catalogue — only the current page is loaded at a time
+  - Page size is configurable in settings (25, 50, 100, 250, 500; default 25)
+- [Select All] / [Deselect All] buttons (apply to visible page), selected count (across all pages), [Run Checks] button
 - Note: "Max 500 records per batch. Rate-limited to protect the server."
 
 ## 3. Record report
@@ -77,6 +80,7 @@ The record report is the core display used for both single-record and batch view
 ### 3.2. Summary bar
 
 - Counts: N passed, N warnings, N errors, N info
+- [Re-check] — re-downloads the record's XML from GeoNetwork and re-runs all checks (only shown for records loaded from a catalogue URL, not for pasted XML). Supports the workflow of fixing issues in GeoNetwork and verifying the fixes.
 - [Copy report] — copies a Markdown-formatted report for the current record to clipboard
 - [Copy report + AI context] — copies the report with a condensed encoding-rules context document prepended, suitable for pasting into any LLM for fix suggestions
 
@@ -121,42 +125,36 @@ When batch checks complete, the layout becomes two-column. The left panel can be
 
 ### 4.1. Left panel
 
-The left panel has two views, switchable via tabs at the top: **[Records]** and **[Summary]**.
-
-**Shared content** (above the tabs):
-- Total records checked and aggregate severity counts
-- [Re-analyse all] button — manually re-runs analysis for all records using current knowledge base state
+**Batch header** (above the record list):
+- Total records checked
+- Test-level severity counts: total pass/warning/error across all individual checks
+- Record-level severity counts with filter checkboxes:
+  ```
+  100 records checked
+  Tests: ✓ 4560 ⚠ 377 ✗ 117
+  Records: [x] ✓ 4 [x] ⚠ 6 [x] ✗ 90
+  ```
+  Unchecking a record-level checkbox hides records of that severity from the list below. For example, unchecking ✓ hides all-passing records so the user can focus on records that need attention.
 - [Copy full report] — copies a Markdown report covering all records
 
-#### Records view
-
-- Filter dropdown (All / Errors only / Warnings+ / Passing)
-- Sort dropdown (Errors first / Alphabetical)
-- Scrollable record list — each row shows worst severity icon and truncated title
+**Record list:**
+- Scrollable list of records — each row shows worst severity icon and truncated title
 - Active record is highlighted
-- Count summary at bottom: N with errors, N with warnings only, N all passing
-- Navigation buttons: [Prev] [Next] for stepping through unresolved records, with keyboard shortcuts (Alt+Left / Alt+Right)
+- Filtered by the severity checkboxes above
 - [Hide panel] button — collapses to full-width
-
-#### Summary view
-
-- Aggregate per-check-section issue counts (how many errors/warnings in each section across all records)
-- Click a section to see per-check aggregates (pass/warn/error counts per individual check)
-- For sections using the knowledge base: count of suppressed warnings (e.g. "14 warnings suppressed — people confirmed as having no ORCID")
-- Knowledge base impact summary: how many people/orgs were learned, how many identifiers are known, how many confirmations were made
 
 ### 4.2. Right panel
 
-Displays the full record report (§3) for the selected record. When the Summary view is active in the left panel, the right panel shows the aggregate detail for the selected check section.
+Displays the full record report (§3) for the selected record.
 
 ## 5. Knowledge base update notifications
 
 When the user interacts with knowledge base controls during record review (confirming "no ORCID", or the tool learns an identifier from a new record), a brief dismissible notification appears:
 - What changed (e.g. "'Smith, Jane' marked as having no ORCID")
 - How many other records in the current batch are affected
-- Reminder to click [Re-analyse all] to update counts
+- Reminder that re-running the batch via [Run Checks] or using per-record [Re-check] will show updated results
 
-Re-analysis is always manual — the user triggers it when ready.
+Re-analysis is always manual — the user triggers it when ready via the existing [Run Checks] button (for all records) or per-record [Re-check] (for individual records).
 
 ## 6. Settings panel
 
@@ -192,6 +190,11 @@ Opens as a slide-in panel from the right edge. The user stays in context with th
 
 - Dropdown: delay between requests (0.5–2.0 seconds, default 0.5)
 - Description: "Protects catalogue servers from overload during batch operations."
+
+### 6.5a. Search results page size
+
+- Dropdown: records per page (25, 50, 100, 250, 500; default 25)
+- Description: "Number of records shown per page in catalogue search results. Smaller values keep the search results compact; use larger values when selecting records for bulk analysis."
 
 ### 6.6. PID cache
 

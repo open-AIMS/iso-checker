@@ -18,6 +18,7 @@ export function defaultSettings(): AppSettings {
     disabledRules: [],
     apiValidationEnabled: true,
     rateLimitMs: 500,
+    searchPageSize: 25,
     setupComplete: false
   };
 }

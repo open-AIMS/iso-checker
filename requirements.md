@@ -44,7 +44,11 @@ Batch mode discovers and processes multiple records from a GeoNetwork catalogue.
 
 #### Record preview before processing
 
-After a CSW search, the tool displays the number of matching records and a listing of record titles, UUIDs, and resource types for at least the first 50 results. The user reviews this list and confirms before the tool begins fetching full records and running validation. This prevents accidental processing of thousands of records. If a search returns zero results, the tool displays "No matching records" rather than an empty table.
+After a CSW search, the tool displays the total number of matching records and a paginated listing of record titles, UUIDs, and resource types. The first page is loaded immediately; subsequent pages are fetched on demand when the user clicks [Next page] or [Previous page]. This avoids loading hundreds of records upfront when the user may only need the first page.
+
+The page size is configurable in settings (25, 50, 100, 250, or 500 records per page; default 25). A smaller default keeps the search results compact and reduces vertical space before the [Run Checks] button, which suits the common case of reviewing a small number of records. Larger page sizes are available for bulk analysis workflows.
+
+The user reviews the listing and confirms before the tool begins fetching full records and running validation. This prevents accidental processing of thousands of records. If a search returns zero results, the tool displays "No matching records" rather than an empty table.
 
 The search preview uses `ElementSetName=brief` in the CSW request, which returns `dc:identifier`, `dc:title`, and `dc:type` — the minimum fields needed for the listing. Testing showed `brief` responses are up to 13× smaller than `summary` responses, significantly reducing server load.
 
@@ -65,7 +69,7 @@ Resource type filtering uses the OGC Filter property name `type` (e.g. `<ogc:Pro
 To avoid placing excessive load on catalogue servers, the tool rate-limits **all** requests to the catalogue server — including CSW search queries, not just individual record fetches. Pre-development throughput testing showed that rapid CSW requests can destabilise slower servers (IMAS became unreachable during testing). The tool enforces:
 
 - **Rate limit:** Default 0.5 second delay between requests, configurable from 0.5 to 2 seconds in settings.
-- **CSW page size:** Default `maxRecords=100` per CSW GetRecords request. Testing showed some catalogues fail at `maxRecords=1000`; 100 is safe across all tested servers.
+- **Search results page size:** Configurable in settings (25, 50, 100, 250, 500 records per page; default 25). This controls the `maxRecords` parameter in CSW GetRecords requests for search preview listings. Pages beyond the first are fetched on demand. Testing showed some catalogues fail at `maxRecords=1000`; 500 is the maximum offered.
 - **Record cap:** Maximum 500 records per batch run. If a search matches more than 500 records, the user is informed of the total and must narrow their search or process in batches.
 
 #### CORS and proxy fallback
@@ -258,18 +262,21 @@ Two clipboard-copy options on every record report:
 
 ## 10. Batch summary
 
-### 10.1. Summary dashboard
+### 10.1. Batch header and record filtering
 
-Aggregate view showing:
+The batch results header shows aggregate counts at two levels: test-level (total pass/warning/error across all individual checks) and record-level (how many records are all-passing, warnings-only, or have errors). Record-level counts double as severity filter checkboxes — unchecking a level hides those records from the list. See `ui-design.md` §4.1 for the layout.
 
-- Total records checked
-- Per-check pass/warn/error counts across all records
-- Per-record summary row (click to drill into full report)
-- Filterable by severity
+### 10.2. Per-record re-check
 
-### 10.2. Warning suppression across records
+Each record report includes a [Re-check] button (next to the [Copy report] buttons in the summary bar). Clicking it re-downloads the record's XML from GeoNetwork and re-runs all checks, replacing the previous results. This supports the workflow of fixing issues in GeoNetwork and then verifying the fixes without re-running the entire batch.
 
-When a user confirms a warning (e.g. confirms a person has no ORCID), that determination is stored in the knowledge base and applies to all records containing the same person or organisation. Re-analysis must be manually triggered by the user after knowledge base changes.
+The [Re-check] button is only shown for records that came from a catalogue URL. It is not shown for records loaded from pasted XML (which have no source URL to re-fetch).
+
+The existing [Run Checks] button in the batch input area serves as the mechanism for re-analysing all records — the user can re-run the batch at any time.
+
+### 10.3. Warning suppression across records
+
+When a user confirms a warning (e.g. confirms a person has no ORCID), that determination is stored in the knowledge base and applies to all records containing the same person or organisation. To see updated results after knowledge base changes, the user re-runs the batch using the [Run Checks] button or uses per-record [Re-check] for individual records.
 
 ## 11. Person/Org knowledge base
 
@@ -332,6 +339,7 @@ Stored in local storage. Includes:
 - **Rule sections:** Enable/disable rule sections and individual rules
 - **API validation toggle:** Enable/disable external PID resolution (default: enabled). When disabled, structural checks still run but resolution and name-matching checks are skipped.
 - **Rate limit:** Delay between requests, configurable from 0.5 to 2 seconds (default 0.5)
+- **Search results page size:** Number of records per page in CSW search results (25, 50, 100, 250, 500; default 25)
 - **PID cache:** Viewable, clearable. Stores API resolution results including canonical/registered names.
 - **Knowledge base:** People and org entries with view/edit, import/export CSV, clear all
 - **All settings exportable/importable** as JSON for team sharing
@@ -436,11 +444,12 @@ The proxy URL (`http://localhost:8080`) is stored per-catalogue in the tool's se
 
 - Batch mode via CSW GetRecords (search URL parsing, UUID list, manual search)
 - Rate limiting (default 0.5 sec delay, configurable 0.5–2 sec) and record cap (default 500)
+- Paginated search results with configurable page size (25–500, default 25) and on-demand page loading
 - Record preview and selection before processing
 - Two-column batch results layout with record list and per-record detail
-- Batch summary dashboard with aggregate counts and per-record drill-down
-- Record navigation (prev/next unresolved, keyboard shortcuts)
-- Manual re-analysis after changes
+- Batch header with test-level and record-level severity counts
+- Record-level severity filter checkboxes (hide all-passing, warnings-only, or error records from list)
+- Per-record [Re-check] button to re-download and re-analyse individual records after edits in GeoNetwork
 
 ### v3 — Knowledge base and identity management
 

@@ -13,6 +13,7 @@ export function defaultSettings() {
         disabledRules: [],
         apiValidationEnabled: true,
         rateLimitMs: 500,
+        searchPageSize: 25,
         setupComplete: false
     };
 }

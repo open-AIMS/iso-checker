@@ -23,6 +23,8 @@ let settings: AppSettings;
 let pidCache: LocalStoragePidCache;
 let knowledgeBase: LocalKnowledgeBase;
 let condensedGuide: string = '';
+let currentSearchTerm: string = '';
+let currentSearchResourceType: string | undefined;
 
 // --- Initialisation ---
 
@@ -132,24 +134,33 @@ function showMainInterface(root: HTMLElement): void {
     },
 
     async searchBatch(term: string, resourceType?: string) {
+      // Store search state for pagination
+      currentSearchTerm = term;
+      currentSearchResourceType = resourceType;
+
+      await controller.searchBatchPage(1);
+    },
+
+    async searchBatchPage(startPosition: number) {
       const cat = controller.getActiveCatalogue();
       if (!cat) {
         alert('No catalogue configured. Open Settings to add one.');
         return;
       }
 
-      const resultsArea = document.getElementById('results-area')!;
       const batchArea = document.getElementById('batch-results-area')!;
       const statusEl = document.getElementById('batch-search-status')!;
       batchArea.style.display = 'block';
       statusEl.textContent = 'Searching...';
 
       try {
+        const pageSize = settings.searchPageSize;
         const client = new CatalogueClient(cat, settings.rateLimitMs);
         const result = await client.searchCsw({
-          searchTerm: term || undefined,
-          resourceType,
-          maxRecords: 100
+          searchTerm: currentSearchTerm || undefined,
+          resourceType: currentSearchResourceType,
+          startPosition,
+          maxRecords: pageSize
         });
 
         if (result.error) {
@@ -169,7 +180,10 @@ function showMainInterface(root: HTMLElement): void {
         renderBatchSearchResults(
           document.querySelector('.input-area')!,
           result.records,
-          result.totalMatched
+          result.totalMatched,
+          startPosition,
+          pageSize,
+          (newStart: number) => controller.searchBatchPage(newStart)
         );
 
         // Wire up Run Checks
