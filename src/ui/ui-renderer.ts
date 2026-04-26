@@ -2,7 +2,7 @@
 // Implements ui-design.md §1–§6
 
 import type {
-  RecordReport, SectionReport, CheckResult, Severity,
+  RecordReport, SectionReport, CheckResult, CheckResultAction, Severity,
   AppSettings, ParsedRecord, RecordType
 } from '../types.js';
 import { getAllSections } from '../rules/rule-registry.js';
@@ -23,6 +23,15 @@ const SEVERITY_ICONS: Record<Severity, string> = {
   warning: '⚠',
   info: 'ℹ'
 };
+
+// --- Global action handler for CheckResultAction buttons ---
+
+type ActionHandler = (actionId: string, data: Record<string, string>) => void;
+let registeredActionHandler: ActionHandler | null = null;
+
+export function registerActionHandler(handler: ActionHandler): void {
+  registeredActionHandler = handler;
+}
 
 // --- Setup screen ---
 
@@ -504,6 +513,13 @@ function renderCheckResult(result: CheckResult): HTMLElement {
     if (result.expected) parts.push(`<div class="detail-row"><strong>Expected:</strong> ${escapeHtml(result.expected)}</div>`);
     if (result.found) parts.push(`<div class="detail-row"><strong>Found:</strong> ${escapeHtml(result.found)}</div>`);
     if (result.fix) parts.push(`<div class="detail-row"><strong>Fix:</strong> ${escapeHtml(result.fix)}</div>`);
+    if (result.suggestion) parts.push(`<div class="detail-row suggestion-row"><strong>Suggested:</strong> <code class="suggestion-value">${escapeHtml(result.suggestion)}</code> <button class="btn btn-copy" data-copy="${escapeHtml(result.suggestion)}" title="Copy to clipboard">Copy</button></div>`);
+    if (result.actions?.length) {
+      const actionBtns = result.actions.map((a, i) =>
+        `<button class="btn btn-action" data-action-index="${i}">${escapeHtml(a.label)}</button>`
+      ).join(' ');
+      parts.push(`<div class="detail-row action-row">${actionBtns}</div>`);
+    }
     if (parts.length > 0) {
       detailHtml = `<div class="check-detail">${parts.join('')}</div>`;
     }
@@ -530,6 +546,32 @@ function renderCheckResult(result: CheckResult): HTMLElement {
     row.addEventListener('click', () => {
       detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
     });
+
+    // Copy button handler
+    const copyBtn = detail.querySelector('.btn-copy') as HTMLButtonElement | null;
+    if (copyBtn) {
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const value = copyBtn.getAttribute('data-copy') ?? '';
+        navigator.clipboard.writeText(value).then(() => {
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+        });
+      });
+    }
+
+    // Action button handlers
+    const actionBtns = detail.querySelectorAll('.btn-action');
+    for (const btn of Array.from(actionBtns)) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt((btn as HTMLElement).dataset.actionIndex!, 10);
+        const action = result.actions?.[idx];
+        if (action && registeredActionHandler) {
+          registeredActionHandler(action.actionId, action.data);
+        }
+      });
+    }
   }
 
   return row;
@@ -540,6 +582,7 @@ function renderCheckResult(result: CheckResult): HTMLElement {
 export function renderSettingsPanel(
   container: HTMLElement,
   settings: AppSettings,
+  knowledgeBase: import('../types.js').KnowledgeBase,
   onSave: (settings: AppSettings) => void,
   onClose: () => void
 ): void {
@@ -547,6 +590,17 @@ export function renderSettingsPanel(
   container.style.display = 'block';
 
   const panel = el('div', 'settings-content');
+
+  function kbSummaryHtml(): string {
+    const people = knowledgeBase.getAllPeople();
+    const orgs = knowledgeBase.getAllOrgs();
+    const pWithOrcid = people.filter(p => p.orcid).length;
+    const pNoOrcid = people.filter(p => p.status === 'no-orcid').length;
+    const oWithRor = orgs.filter(o => o.ror).length;
+    const oNoRor = orgs.filter(o => o.status === 'no-ror').length;
+    return `People: <strong>${people.length}</strong> (${pWithOrcid} with ORCID, ${pNoOrcid} confirmed no ORCID) · Organisations: <strong>${orgs.length}</strong> (${oWithRor} with ROR, ${oNoRor} confirmed no ROR)`;
+  }
+
   panel.innerHTML = `
     <div class="settings-header">
       <h2>Settings</h2>
@@ -594,6 +648,16 @@ export function renderSettingsPanel(
         <option value="2000" ${settings.rateLimitMs === 2000 ? 'selected' : ''}>2.0 seconds</option>
       </select>
       <p class="help-text">Delay between requests. Protects catalogue servers from overload.</p>
+    </section>
+
+    <section class="settings-section">
+      <h3>Knowledge Base</h3>
+      <p class="help-text kb-summary">${kbSummaryHtml()}</p>
+      <p class="help-text">Built automatically from analysed records and PID API lookups. Use View/Edit to review entries and delete incorrect ones.</p>
+      <div class="settings-btn-row">
+        <button class="btn btn-small" id="kb-view-edit">View / Edit</button>
+        <button class="btn btn-small btn-danger" id="kb-clear-all">Clear entire knowledge base</button>
+      </div>
     </section>
 
     <section class="settings-section">
@@ -722,6 +786,453 @@ export function renderSettingsPanel(
     };
     input.click();
   });
+
+  // KB: View / Edit
+  panel.querySelector('#kb-view-edit')?.addEventListener('click', () => {
+    renderKnowledgeBaseEditor(container, knowledgeBase, () => {
+      // Refresh summary counts when editor closes
+      const summary = panel.querySelector('.kb-summary');
+      if (summary) summary.innerHTML = kbSummaryHtml();
+    });
+  });
+
+  // KB: Clear all
+  panel.querySelector('#kb-clear-all')?.addEventListener('click', () => {
+    if (!confirm('Clear the entire knowledge base? This cannot be undone.')) return;
+    knowledgeBase.clearAll();
+    const summary = panel.querySelector('.kb-summary');
+    if (summary) summary.innerHTML = kbSummaryHtml();
+    showToast('Knowledge base cleared.');
+  });
+}
+
+// --- Knowledge base editor ---
+
+function renderKnowledgeBaseEditor(
+  container: HTMLElement,
+  kb: import('../types.js').KnowledgeBase,
+  onClose: () => void
+): void {
+  const overlay = el('div', 'kb-editor-overlay');
+  const modal = el('div', 'kb-editor-modal');
+
+  let activeTab: 'people' | 'orgs' = 'people';
+  let activeStatusFilter: 'all' | 'with-id' | 'no-id' = 'all';
+
+  const csvFormatPeople = `<strong>Format: name, orcid, status, aliases</strong>
+<pre class="kb-csv-fields">name     — LastName, FirstName (to match metadata records)
+orcid    — ORCID string or empty
+status   — "auto" (learned from records or imported with a
+             known identifier) or "no-orcid" (confirmed: no ORCID)
+aliases  — Pipe-separated alternative names, or empty</pre>
+<strong>Example:</strong>
+<pre>name,orcid,status,aliases
+"Davis, Aaron",0000-0002-8278-9599,auto,
+"Bon, Aaron",,no-orcid,
+"Lawrey, Eric",0000-0002-1234-5678,auto,Lawrey, E.P.
+"Smith, Jane",0000-0001-9876-5432,auto,Smith, J.|Smith, Jane A.</pre>`;
+
+  const csvFormatOrgs = `<strong>Format: name, ror, status, aliases</strong>
+<pre class="kb-csv-fields">name     — Organisation name (as it appears in metadata records)
+ror      — ROR ID or empty
+status   — "auto" (learned from records or imported with a
+             known identifier) or "no-ror" (confirmed: no ROR)
+aliases  — Pipe-separated alternative names, or empty</pre>
+<strong>Example:</strong>
+<pre>name,ror,status,aliases
+"Australian Institute of Marine Science",03x57gn41,auto,AIMS
+"Aerial Architecture",,no-ror,
+"James Cook University",04gsp2c11,auto,JCU|TropWATER, James Cook University</pre>`;
+
+  modal.innerHTML = `
+    <div class="kb-editor-header">
+      <h2>Knowledge Base</h2>
+      <button class="btn btn-icon kb-editor-close">✕</button>
+    </div>
+    <p class="help-text">Built automatically from analysed records and PID API lookups. Use this screen to review entries and delete incorrect ones.</p>
+    <div class="kb-editor-tabs">
+      <button class="kb-tab-btn active" data-kb-tab="people">People (<span class="kb-people-count">${kb.getAllPeople().length}</span>)</button>
+      <button class="kb-tab-btn" data-kb-tab="orgs">Organisations (<span class="kb-orgs-count">${kb.getAllOrgs().length}</span>)</button>
+    </div>
+    <div class="kb-editor-toolbar">
+      <button class="btn btn-small" id="kb-export-csv">Export CSV</button>
+      <button class="btn btn-small" id="kb-import-csv">Import CSV</button>
+      <div class="kb-import-mode" style="display:none">
+        <span class="kb-import-prompt"></span>
+        <button class="btn btn-small" id="kb-import-replace">Replace</button>
+        <button class="btn btn-small" id="kb-import-merge">Merge</button>
+        <button class="btn btn-small" id="kb-import-cancel">Cancel</button>
+      </div>
+      <details class="kb-csv-format">
+        <summary>CSV format</summary>
+        <div class="kb-csv-format-content">${csvFormatPeople}</div>
+      </details>
+    </div>
+    <div class="kb-status-filters">
+      <button class="kb-status-btn active" data-status-filter="all">All</button>
+      <button class="kb-status-btn" data-status-filter="with-id">With ID</button>
+      <button class="kb-status-btn" data-status-filter="no-id">Confirmed no ID</button>
+      <span class="kb-visible-count"></span>
+    </div>
+    <div class="kb-editor-filter">
+      <input type="text" class="input-field kb-filter-input" placeholder="Filter by name or alias…" />
+    </div>
+    <div class="kb-tab-panel active" id="kb-panel-people"></div>
+    <div class="kb-tab-panel" id="kb-panel-orgs"></div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Close
+  const closeEditor = () => {
+    overlay.remove();
+    onClose();
+  };
+  modal.querySelector('.kb-editor-close')?.addEventListener('click', closeEditor);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeEditor();
+  });
+
+  // Tabs
+  const tabBtns = modal.querySelectorAll('.kb-tab-btn');
+  const panels = modal.querySelectorAll('.kb-tab-panel');
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach(b => b.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const tabId = (btn as HTMLElement).dataset.kbTab as 'people' | 'orgs';
+      activeTab = tabId;
+      modal.querySelector(`#kb-panel-${tabId}`)?.classList.add('active');
+      // Update CSV format instructions
+      const formatContent = modal.querySelector('.kb-csv-format-content')!;
+      formatContent.innerHTML = activeTab === 'people' ? csvFormatPeople : csvFormatOrgs;
+      // Reset filters when switching tabs
+      (modal.querySelector('.kb-filter-input') as HTMLInputElement).value = '';
+      activeStatusFilter = 'all';
+      modal.querySelectorAll('.kb-status-btn').forEach(b => b.classList.remove('active'));
+      modal.querySelector('.kb-status-btn[data-status-filter="all"]')?.classList.add('active');
+      applyFilters();
+    });
+  });
+
+  // Render tables
+  const peoplePanel = modal.querySelector('#kb-panel-people')!;
+  const orgsPanel = modal.querySelector('#kb-panel-orgs')!;
+
+  function renderPeopleTable(): void {
+    const people = kb.getAllPeople();
+    peoplePanel.innerHTML = '';
+    if (people.length === 0) {
+      peoplePanel.innerHTML = '<p class="help-text">No people in knowledge base.</p>';
+      return;
+    }
+    const table = el('table', 'kb-table');
+    table.innerHTML = `
+      <thead><tr>
+        <th>Name</th><th>ORCID</th><th>Aliases</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector('tbody')!;
+    for (const p of people) {
+      const tr = document.createElement('tr');
+      tr.dataset.searchText = [p.name, ...p.aliases].join(' ').toLowerCase();
+      tr.dataset.status = p.orcid ? 'with-id' : (p.status === 'no-orcid' ? 'no-id' : 'auto-no-id');
+      const orcidCell = p.status === 'no-orcid'
+        ? '<span class="kb-confirmed">confirmed: no ORCID</span>'
+        : p.orcid
+          ? `<a href="https://orcid.org/${escapeHtml(p.orcid)}" target="_blank" rel="noopener">${escapeHtml(p.orcid)}</a>`
+          : '—';
+      tr.innerHTML = `
+        <td>${escapeHtml(p.name)}${p.registeredName && p.registeredName !== p.name ? ` <span class="kb-canonical">(${escapeHtml(p.registeredName)})</span>` : ''}</td>
+        <td>${orcidCell}</td>
+        <td class="kb-aliases">${p.aliases.length ? escapeHtml(p.aliases.join(', ')) : '—'}</td>
+        <td><button class="btn btn-small btn-danger kb-delete-btn">Delete</button></td>
+      `;
+      tr.querySelector('.kb-delete-btn')?.addEventListener('click', () => {
+        kb.removePerson(p.name);
+        renderPeopleTable();
+        updateCounts();
+        applyFilters();
+      });
+      tbody.appendChild(tr);
+    }
+    peoplePanel.appendChild(table);
+  }
+
+  function renderOrgsTable(): void {
+    const orgs = kb.getAllOrgs();
+    orgsPanel.innerHTML = '';
+    if (orgs.length === 0) {
+      orgsPanel.innerHTML = '<p class="help-text">No organisations in knowledge base.</p>';
+      return;
+    }
+    const table = el('table', 'kb-table');
+    table.innerHTML = `
+      <thead><tr>
+        <th>Name</th><th>ROR</th><th>Aliases</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector('tbody')!;
+    for (const o of orgs) {
+      const tr = document.createElement('tr');
+      tr.dataset.searchText = [o.name, ...o.aliases].join(' ').toLowerCase();
+      tr.dataset.status = o.ror ? 'with-id' : (o.status === 'no-ror' ? 'no-id' : 'auto-no-id');
+      const rorCell = o.status === 'no-ror'
+        ? '<span class="kb-confirmed">confirmed: no ROR</span>'
+        : o.ror
+          ? `<a href="https://ror.org/${escapeHtml(o.ror)}" target="_blank" rel="noopener">${escapeHtml(o.ror)}</a>`
+          : '—';
+      tr.innerHTML = `
+        <td>${escapeHtml(o.name)}${o.canonicalName && o.canonicalName !== o.name ? ` <span class="kb-canonical">(${escapeHtml(o.canonicalName)})</span>` : ''}</td>
+        <td>${rorCell}</td>
+        <td class="kb-aliases">${o.aliases.length ? escapeHtml(o.aliases.join(', ')) : '—'}</td>
+        <td><button class="btn btn-small btn-danger kb-delete-btn">Delete</button></td>
+      `;
+      tr.querySelector('.kb-delete-btn')?.addEventListener('click', () => {
+        kb.removeOrg(o.name);
+        renderOrgsTable();
+        updateCounts();
+        applyFilters();
+      });
+      tbody.appendChild(tr);
+    }
+    orgsPanel.appendChild(table);
+  }
+
+  function updateCounts(): void {
+    const pCount = modal.querySelector('.kb-people-count');
+    const oCount = modal.querySelector('.kb-orgs-count');
+    if (pCount) pCount.textContent = String(kb.getAllPeople().length);
+    if (oCount) oCount.textContent = String(kb.getAllOrgs().length);
+  }
+
+  function applyFilters(): void {
+    const searchTerm = (modal.querySelector('.kb-filter-input') as HTMLInputElement).value.toLowerCase();
+    const activePanel = activeTab === 'people' ? peoplePanel : orgsPanel;
+    const rows = activePanel.querySelectorAll('.kb-table tbody tr');
+    let visible = 0;
+    let total = 0;
+    rows.forEach(tr => {
+      total++;
+      const text = (tr as HTMLElement).dataset.searchText ?? '';
+      const status = (tr as HTMLElement).dataset.status ?? '';
+      const matchesSearch = !searchTerm || text.includes(searchTerm);
+      const matchesStatus = activeStatusFilter === 'all' ||
+        (activeStatusFilter === 'with-id' && status === 'with-id') ||
+        (activeStatusFilter === 'no-id' && status === 'no-id');
+      const show = matchesSearch && matchesStatus;
+      (tr as HTMLElement).style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    const countEl = modal.querySelector('.kb-visible-count');
+    if (countEl) {
+      countEl.textContent = visible < total ? `Showing ${visible} of ${total}` : '';
+    }
+  }
+
+  // Filter input
+  modal.querySelector('.kb-filter-input')?.addEventListener('input', () => {
+    applyFilters();
+  });
+
+  // Status filter toggles
+  modal.querySelectorAll('.kb-status-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.querySelectorAll('.kb-status-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeStatusFilter = (btn as HTMLElement).dataset.statusFilter as 'all' | 'with-id' | 'no-id';
+      applyFilters();
+    });
+  });
+
+  // Export CSV — exports only visible (filtered) rows
+  modal.querySelector('#kb-export-csv')?.addEventListener('click', () => {
+    const activePanel = activeTab === 'people' ? peoplePanel : orgsPanel;
+    const visibleRows = activePanel.querySelectorAll('.kb-table tbody tr');
+    const items: string[] = [];
+    const allPeople = activeTab === 'people' ? kb.getAllPeople() : [];
+    const allOrgs = activeTab === 'orgs' ? kb.getAllOrgs() : [];
+
+    let idx = 0;
+    visibleRows.forEach(tr => {
+      if ((tr as HTMLElement).style.display !== 'none') {
+        if (activeTab === 'people' && allPeople[idx]) {
+          const p = allPeople[idx];
+          items.push(`"${csvEscapeField(p.name)}","${csvEscapeField(p.orcid ?? '')}","${p.status}","${csvEscapeField(p.aliases.join('|'))}"`);
+        } else if (activeTab === 'orgs' && allOrgs[idx]) {
+          const o = allOrgs[idx];
+          items.push(`"${csvEscapeField(o.name)}","${csvEscapeField(o.ror ?? '')}","${o.status}","${csvEscapeField(o.aliases.join('|'))}"`);
+        }
+      }
+      idx++;
+    });
+
+    const header = activeTab === 'people' ? 'name,orcid,status,aliases' : 'name,ror,status,aliases';
+    const csv = [header, ...items].join('\n');
+    const filename = activeTab === 'people' ? 'kb-people.csv' : 'kb-orgs.csv';
+    downloadFile(filename, csv, 'text/csv');
+  });
+
+  // Import CSV — file picker then mode selection
+  let pendingImportText: string | null = null;
+  const importModeDiv = modal.querySelector('.kb-import-mode') as HTMLElement;
+  const importPrompt = modal.querySelector('.kb-import-prompt') as HTMLElement;
+
+  modal.querySelector('#kb-import-csv')?.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+
+      // Stage 6: Validate header matches active tab
+      const firstLine = text.split(/\r?\n/)[0]?.toLowerCase() ?? '';
+      if (activeTab === 'people' && firstLine.includes('ror') && !firstLine.includes('orcid')) {
+        showToast('This looks like an organisations CSV. Switch to the Organisations tab to import it.');
+        return;
+      }
+      if (activeTab === 'orgs' && firstLine.includes('orcid') && !firstLine.includes('ror')) {
+        showToast('This looks like a people CSV. Switch to the People tab to import it.');
+        return;
+      }
+
+      pendingImportText = text;
+      const typeName = activeTab === 'people' ? 'people' : 'organisations';
+      importPrompt.textContent = `Import mode for ${typeName}:`;
+      importModeDiv.style.display = 'flex';
+    };
+    input.click();
+  });
+
+  modal.querySelector('#kb-import-replace')?.addEventListener('click', () => {
+    if (!pendingImportText) return;
+    const typeName = activeTab === 'people' ? 'people' : 'organisations';
+    if (!confirm(`This will clear all existing ${typeName} and replace them with the imported file. Continue?`)) return;
+    if (activeTab === 'people') kb.clearPeople();
+    else kb.clearOrgs();
+    const count = importKbCsv(kb, pendingImportText, activeTab);
+    finishImport(count);
+  });
+
+  modal.querySelector('#kb-import-merge')?.addEventListener('click', () => {
+    if (!pendingImportText) return;
+    const count = importKbCsv(kb, pendingImportText, activeTab);
+    finishImport(count);
+  });
+
+  modal.querySelector('#kb-import-cancel')?.addEventListener('click', () => {
+    pendingImportText = null;
+    importModeDiv.style.display = 'none';
+  });
+
+  function finishImport(count: number): void {
+    pendingImportText = null;
+    importModeDiv.style.display = 'none';
+    if (activeTab === 'people') renderPeopleTable();
+    else renderOrgsTable();
+    updateCounts();
+    applyFilters();
+    showToast(`Imported ${count} entries.`);
+  }
+
+  renderPeopleTable();
+  renderOrgsTable();
+  applyFilters();
+}
+
+// --- KB CSV import helper ---
+
+function importKbCsv(kb: import('../types.js').KnowledgeBase, text: string, type: 'people' | 'orgs'): number {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return 0;
+
+  // Skip header row — use type parameter instead of auto-detecting
+  let count = 0;
+
+  for (let i = 1; i < lines.length; i++) {
+    const fields = parseCsvLine(lines[i]);
+    if (fields.length < 1) continue;
+
+    const name = fields[0];
+    const identifier = (fields.length > 1 ? fields[1] : '') || null;
+    const statusRaw = fields.length > 2 ? fields[2] : 'auto';
+    const aliases = (fields.length > 3 && fields[3]) ? fields[3].split('|').filter(a => a.trim()) : [];
+
+    if (!name) continue;
+
+    if (type === 'people') {
+      kb.addOrUpdatePerson({
+        name,
+        orcid: identifier,
+        registeredName: null,
+        status: statusRaw === 'no-orcid' ? 'no-orcid' : 'auto',
+        aliases,
+        sourceRecords: []
+      });
+    } else {
+      kb.addOrUpdateOrg({
+        name,
+        ror: identifier,
+        canonicalName: null,
+        status: statusRaw === 'no-ror' ? 'no-ror' : 'auto',
+        aliases,
+        sourceRecords: []
+      });
+    }
+    count++;
+  }
+  return count;
+}
+
+/** Parse a single CSV line respecting quoted fields */
+function parseCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        fields.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+  }
+  fields.push(current);
+  return fields;
+}
+
+// --- File download helper ---
+
+function downloadFile(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // --- Batch results ---
@@ -1092,7 +1603,7 @@ function renderConnectionStatus(container: HTMLElement, result: ConnectionTestRe
 
 // --- Toast notification ---
 
-function showToast(message: string): void {
+export function showToast(message: string): void {
   const existing = document.querySelector('.toast');
   if (existing) existing.remove();
 
@@ -1126,6 +1637,10 @@ function escapeHtml(s: string): string {
   const div = document.createElement('div');
   div.textContent = s;
   return div.innerHTML;
+}
+
+function csvEscapeField(s: string): string {
+  return s.replace(/"/g, '""');
 }
 
 /**

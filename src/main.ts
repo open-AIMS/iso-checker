@@ -14,7 +14,7 @@ import { loadSettings, saveSettings, enabledSectionsSet, LocalKnowledgeBase } fr
 import {
   renderSetupScreen, renderMainInterface, renderRecordReport,
   renderSettingsPanel, renderBatchSearchResults, getSelectedBatchUuids,
-  renderBatchReport, type AppController
+  renderBatchReport, registerActionHandler, showToast, type AppController
 } from './ui/ui-renderer.js';
 
 // --- Globals ---
@@ -32,6 +32,49 @@ async function init(): Promise<void> {
   settings = loadSettings();
   pidCache = new LocalStoragePidCache();
   knowledgeBase = new LocalKnowledgeBase();
+
+  // Register action handler for KB confirmation buttons
+  registerActionHandler((actionId, data) => {
+    if (actionId === 'confirm-no-orcid' && data.name) {
+      knowledgeBase.addOrUpdatePerson({
+        name: data.name,
+        orcid: null,
+        registeredName: null,
+        status: 'no-orcid',
+        aliases: [],
+        sourceRecords: []
+      });
+      showToast(`"${data.name}" marked as no ORCID. Re-check to update.`);
+    } else if (actionId === 'confirm-no-ror' && data.name) {
+      knowledgeBase.addOrUpdateOrg({
+        name: data.name,
+        ror: null,
+        canonicalName: null,
+        status: 'no-ror',
+        aliases: [],
+        sourceRecords: []
+      });
+      showToast(`"${data.name}" marked as no ROR. Re-check to update.`);
+    } else if (actionId === 'add-alias-org' && data.alias && data.ror) {
+      const existing = knowledgeBase.getAllOrgs().find(o => o.ror === data.ror);
+      if (existing) {
+        if (!existing.aliases.includes(data.alias)) {
+          existing.aliases.push(data.alias);
+          knowledgeBase.addOrUpdateOrg(existing);
+        }
+        showToast(`"${data.alias}" added as alias of "${existing.canonicalName ?? existing.name}". Re-check to update.`);
+      }
+    } else if (actionId === 'add-alias-person' && data.alias && data.orcid) {
+      const existing = knowledgeBase.getAllPeople().find(p => p.orcid === data.orcid);
+      if (existing) {
+        if (!existing.aliases.includes(data.alias)) {
+          existing.aliases.push(data.alias);
+          knowledgeBase.addOrUpdatePerson(existing);
+        }
+        showToast(`"${data.alias}" added as alias of "${existing.registeredName ?? existing.name}". Re-check to update.`);
+      }
+    }
+  });
 
   // Load condensed guide for AI context export
   try {
@@ -254,7 +297,7 @@ function showMainInterface(root: HTMLElement): void {
     toggleSettings() {
       const panel = document.getElementById('settings-panel')!;
       if (panel.style.display === 'none' || !panel.style.display) {
-        renderSettingsPanel(panel, settings, (newSettings) => {
+        renderSettingsPanel(panel, settings, knowledgeBase, (newSettings) => {
           settings = newSettings;
           saveSettings(settings);
         }, () => {

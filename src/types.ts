@@ -24,6 +24,16 @@ export interface CheckResult {
   entity?: string;
   /** URL to link the primary identifier value for quick verification */
   link?: string;
+  /** Suggested identifier value from the knowledge base (copyable) */
+  suggestion?: string;
+  /** Action buttons for user interaction (e.g. confirm no ORCID) */
+  actions?: CheckResultAction[];
+}
+
+export interface CheckResultAction {
+  label: string;
+  actionId: string;
+  data: Record<string, string>;
 }
 
 // --- Rule section ---
@@ -208,7 +218,23 @@ export interface KnowledgeBaseOrg {
 export interface KnowledgeBase {
   findPerson(name: string): KnowledgeBasePerson | null;
   findOrg(name: string): KnowledgeBaseOrg | null;
-  // v3: full CRUD operations
+  addOrUpdatePerson(person: KnowledgeBasePerson): void;
+  addOrUpdateOrg(org: KnowledgeBaseOrg): void;
+  getAllPeople(): KnowledgeBasePerson[];
+  getAllOrgs(): KnowledgeBaseOrg[];
+  findAllPeopleByName(name: string): KnowledgeBasePerson[];
+  findAllOrgsByName(name: string): KnowledgeBaseOrg[];
+  /** Fuzzy search: returns orgs where name or alias is a substring match (or vice versa) */
+  fuzzyFindOrgs(name: string): KnowledgeBaseOrg[];
+  /** Fuzzy search: returns people where name or alias is a substring match (or vice versa) */
+  fuzzyFindPeople(name: string): KnowledgeBasePerson[];
+  removePerson(name: string): void;
+  removeOrg(name: string): void;
+  clearPeople(): void;
+  clearOrgs(): void;
+  clearAll(): void;
+  exportPeopleCsv(): string;
+  exportOrgsCsv(): string;
 }
 
 // --- Settings ---

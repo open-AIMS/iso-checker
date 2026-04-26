@@ -86,6 +86,44 @@ export class LocalKnowledgeBase {
     getAllOrgs() {
         return [...this.orgs];
     }
+    findAllPeopleByName(name) {
+        const lower = name.toLowerCase();
+        return this.people.filter(p => p.name.toLowerCase() === lower ||
+            p.aliases.some(a => a.toLowerCase() === lower));
+    }
+    findAllOrgsByName(name) {
+        const lower = name.toLowerCase();
+        return this.orgs.filter(o => o.name.toLowerCase() === lower ||
+            o.aliases.some(a => a.toLowerCase() === lower));
+    }
+    fuzzyFindOrgs(name) {
+        const lower = name.toLowerCase();
+        return this.orgs.filter(o => {
+            const oLower = o.name.toLowerCase();
+            if (oLower === lower)
+                return false; // skip exact matches — use findAllOrgsByName for those
+            if (lower.includes(oLower) || oLower.includes(lower))
+                return true;
+            return o.aliases.some(a => {
+                const aLower = a.toLowerCase();
+                return aLower !== lower && (lower.includes(aLower) || aLower.includes(lower));
+            });
+        });
+    }
+    fuzzyFindPeople(name) {
+        const lower = name.toLowerCase();
+        return this.people.filter(p => {
+            const pLower = p.name.toLowerCase();
+            if (pLower === lower)
+                return false;
+            if (lower.includes(pLower) || pLower.includes(lower))
+                return true;
+            return p.aliases.some(a => {
+                const aLower = a.toLowerCase();
+                return aLower !== lower && (lower.includes(aLower) || aLower.includes(lower));
+            });
+        });
+    }
     addOrUpdatePerson(person) {
         const idx = this.people.findIndex(p => (p.orcid && p.orcid === person.orcid) ||
             p.name.toLowerCase() === person.name.toLowerCase());
@@ -135,6 +173,14 @@ export class LocalKnowledgeBase {
     }
     removeOrg(name) {
         this.orgs = this.orgs.filter(o => o.name !== name);
+        this.save();
+    }
+    clearPeople() {
+        this.people = [];
+        this.save();
+    }
+    clearOrgs() {
+        this.orgs = [];
         this.save();
     }
     clearAll() {

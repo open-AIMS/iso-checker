@@ -109,6 +109,48 @@ export class LocalKnowledgeBase implements KnowledgeBase {
     return [...this.orgs];
   }
 
+  findAllPeopleByName(name: string): KnowledgeBasePerson[] {
+    const lower = name.toLowerCase();
+    return this.people.filter(p =>
+      p.name.toLowerCase() === lower ||
+      p.aliases.some(a => a.toLowerCase() === lower)
+    );
+  }
+
+  findAllOrgsByName(name: string): KnowledgeBaseOrg[] {
+    const lower = name.toLowerCase();
+    return this.orgs.filter(o =>
+      o.name.toLowerCase() === lower ||
+      o.aliases.some(a => a.toLowerCase() === lower)
+    );
+  }
+
+  fuzzyFindOrgs(name: string): KnowledgeBaseOrg[] {
+    const lower = name.toLowerCase();
+    return this.orgs.filter(o => {
+      const oLower = o.name.toLowerCase();
+      if (oLower === lower) return false; // skip exact matches — use findAllOrgsByName for those
+      if (lower.includes(oLower) || oLower.includes(lower)) return true;
+      return o.aliases.some(a => {
+        const aLower = a.toLowerCase();
+        return aLower !== lower && (lower.includes(aLower) || aLower.includes(lower));
+      });
+    });
+  }
+
+  fuzzyFindPeople(name: string): KnowledgeBasePerson[] {
+    const lower = name.toLowerCase();
+    return this.people.filter(p => {
+      const pLower = p.name.toLowerCase();
+      if (pLower === lower) return false;
+      if (lower.includes(pLower) || pLower.includes(lower)) return true;
+      return p.aliases.some(a => {
+        const aLower = a.toLowerCase();
+        return aLower !== lower && (lower.includes(aLower) || aLower.includes(lower));
+      });
+    });
+  }
+
   addOrUpdatePerson(person: KnowledgeBasePerson): void {
     const idx = this.people.findIndex(p =>
       (p.orcid && p.orcid === person.orcid) ||
@@ -161,6 +203,16 @@ export class LocalKnowledgeBase implements KnowledgeBase {
 
   removeOrg(name: string): void {
     this.orgs = this.orgs.filter(o => o.name !== name);
+    this.save();
+  }
+
+  clearPeople(): void {
+    this.people = [];
+    this.save();
+  }
+
+  clearOrgs(): void {
+    this.orgs = [];
     this.save();
   }
 

@@ -56,14 +56,73 @@ async function checkOrgRor(
         entity: entityLabel
       });
     } else {
-      results.push({
-        id: 'ror-missing',
-        name: 'ROR present',
-        severity: 'warning',
-        message: `No ROR found for "${entityLabel}". ISO 19139 only supports ROR in onlineResource.`,
-        entity: entityLabel,
-        fix: 'Consider converting to ISO 19115-3 to use partyIdentifier for ROR.'
-      });
+      const kbMatches = org.name ? context.knowledgeBase.findAllOrgsByName(org.name) : [];
+      const noRorConfirmed = kbMatches.some(m => m.status === 'no-ror');
+      const withRor = kbMatches.filter(m => m.ror);
+      const uniqueRors = [...new Set(withRor.map(m => m.ror))];
+
+      if (noRorConfirmed) {
+        results.push({
+          id: 'ror-missing',
+          name: 'ROR present',
+          severity: 'info',
+          message: `Confirmed: no ROR for "${entityLabel}".`,
+          entity: entityLabel
+        });
+      } else if (uniqueRors.length === 1) {
+        const match = withRor[0];
+        results.push({
+          id: 'ror-missing',
+          name: 'ROR present',
+          severity: 'warning',
+          message: `No ROR found for "${entityLabel}". KB suggests ${match.ror}${match.canonicalName ? ` (${match.canonicalName})` : ''}.`,
+          entity: entityLabel,
+          fix: 'Consider converting to ISO 19115-3 to use partyIdentifier for ROR.',
+          suggestion: `https://ror.org/${match.ror}`,
+          link: `https://ror.org/${match.ror}`
+        });
+      } else if (uniqueRors.length > 1) {
+        const options = withRor.map(m => `${m.ror}${m.canonicalName ? ` (${m.canonicalName})` : ''}`).join(', ');
+        results.push({
+          id: 'ror-missing',
+          name: 'ROR present',
+          severity: 'warning',
+          message: `No ROR found for "${entityLabel}". KB has conflicting RORs: ${options}.`,
+          entity: entityLabel,
+          fix: 'Consider converting to ISO 19115-3 to use partyIdentifier for ROR.'
+        });
+      } else {
+        // No exact KB match — try fuzzy match
+        const fuzzyMatches = org.name ? context.knowledgeBase.fuzzyFindOrgs(org.name) : [];
+        const fuzzyWithRor = fuzzyMatches.filter(m => m.ror);
+        if (fuzzyWithRor.length > 0) {
+          const match = fuzzyWithRor[0];
+          const actions: { label: string; actionId: string; data: Record<string, string> }[] = org.name
+            ? [{ label: `Add as alias of ${match.canonicalName ?? match.name}`, actionId: 'add-alias-org', data: { alias: org.name, ror: match.ror! } }]
+            : [];
+          results.push({
+            id: 'ror-missing',
+            name: 'ROR present',
+            severity: 'warning',
+            message: `No ROR found for "${entityLabel}". Possible KB match: ${match.ror}${match.canonicalName ? ` (${match.canonicalName})` : ''}.`,
+            entity: entityLabel,
+            fix: 'Consider converting to ISO 19115-3 to use partyIdentifier for ROR.',
+            suggestion: `https://ror.org/${match.ror}`,
+            link: `https://ror.org/${match.ror}`,
+            actions: actions.length ? actions : undefined
+          });
+        } else {
+          results.push({
+            id: 'ror-missing',
+            name: 'ROR present',
+            severity: 'warning',
+            message: `No ROR found for "${entityLabel}". ISO 19139 only supports ROR in onlineResource.`,
+            entity: entityLabel,
+            fix: 'Consider converting to ISO 19115-3 to use partyIdentifier for ROR.',
+            actions: org.name ? [{ label: 'Confirm: no ROR', actionId: 'confirm-no-ror', data: { name: org.name } }] : undefined
+          });
+        }
+      }
     }
     return results;
   }
@@ -80,14 +139,73 @@ async function checkOrgRor(
   const hasOnline = !!onlineRor;
 
   if (!hasPartyId && !hasOnline) {
-    results.push({
-      id: 'ror-missing',
-      name: 'ROR present',
-      severity: 'warning',
-      message: `No ROR found for "${entityLabel}".`,
-      entity: entityLabel,
-      fix: 'Add ROR in both cit:partyIdentifier and cit:onlineResource.'
-    });
+    const kbMatches = org.name ? context.knowledgeBase.findAllOrgsByName(org.name) : [];
+    const noRorConfirmed = kbMatches.some(m => m.status === 'no-ror');
+    const withRor = kbMatches.filter(m => m.ror);
+    const uniqueRors = [...new Set(withRor.map(m => m.ror))];
+
+    if (noRorConfirmed) {
+      results.push({
+        id: 'ror-missing',
+        name: 'ROR present',
+        severity: 'info',
+        message: `Confirmed: no ROR for "${entityLabel}".`,
+        entity: entityLabel
+      });
+    } else if (uniqueRors.length === 1) {
+      const match = withRor[0];
+      results.push({
+        id: 'ror-missing',
+        name: 'ROR present',
+        severity: 'warning',
+        message: `No ROR found for "${entityLabel}". KB suggests ${match.ror}${match.canonicalName ? ` (${match.canonicalName})` : ''}.`,
+        entity: entityLabel,
+        fix: 'Add ROR in both cit:partyIdentifier and cit:onlineResource.',
+        suggestion: `https://ror.org/${match.ror}`,
+        link: `https://ror.org/${match.ror}`
+      });
+    } else if (uniqueRors.length > 1) {
+      const options = withRor.map(m => `${m.ror}${m.canonicalName ? ` (${m.canonicalName})` : ''}`).join(', ');
+      results.push({
+        id: 'ror-missing',
+        name: 'ROR present',
+        severity: 'warning',
+        message: `No ROR found for "${entityLabel}". KB has conflicting RORs: ${options}.`,
+        entity: entityLabel,
+        fix: 'Add ROR in both cit:partyIdentifier and cit:onlineResource.'
+      });
+    } else {
+      // No exact KB match — try fuzzy match
+      const fuzzyMatches = org.name ? context.knowledgeBase.fuzzyFindOrgs(org.name) : [];
+      const fuzzyWithRor = fuzzyMatches.filter(m => m.ror);
+      if (fuzzyWithRor.length > 0) {
+        const match = fuzzyWithRor[0];
+        const actions: { label: string; actionId: string; data: Record<string, string> }[] = org.name
+          ? [{ label: `Add as alias of ${match.canonicalName ?? match.name}`, actionId: 'add-alias-org', data: { alias: org.name, ror: match.ror! } }]
+          : [];
+        results.push({
+          id: 'ror-missing',
+          name: 'ROR present',
+          severity: 'warning',
+          message: `No ROR found for "${entityLabel}". Possible KB match: ${match.ror}${match.canonicalName ? ` (${match.canonicalName})` : ''}.`,
+          entity: entityLabel,
+          fix: 'Add ROR in both cit:partyIdentifier and cit:onlineResource.',
+          suggestion: `https://ror.org/${match.ror}`,
+          link: `https://ror.org/${match.ror}`,
+          actions: actions.length ? actions : undefined
+        });
+      } else {
+        results.push({
+          id: 'ror-missing',
+          name: 'ROR present',
+          severity: 'warning',
+          message: `No ROR found for "${entityLabel}".`,
+          entity: entityLabel,
+          fix: 'Add ROR in both cit:partyIdentifier and cit:onlineResource.',
+          actions: org.name ? [{ label: 'Confirm: no ROR', actionId: 'confirm-no-ror', data: { name: org.name } }] : undefined
+        });
+      }
+    }
     return results;
   }
 
@@ -226,7 +344,32 @@ async function checkOrgRor(
             });
           }
         }
+
+        // Populate knowledge base
+        const kbName = result.canonicalName ?? org.name ?? code;
+        const aliases: string[] = [];
+        if (org.name && result.canonicalName && org.name !== result.canonicalName) {
+          aliases.push(org.name);
+        }
+        context.knowledgeBase.addOrUpdateOrg({
+          name: kbName,
+          ror: code,
+          canonicalName: result.canonicalName ?? null,
+          status: 'auto',
+          aliases,
+          sourceRecords: record.uuid ? [record.uuid] : []
+        });
       }
+    } else if (code && !code.startsWith('http')) {
+      // API disabled but ROR present — populate KB without canonical name
+      context.knowledgeBase.addOrUpdateOrg({
+        name: org.name ?? code,
+        ror: code,
+        canonicalName: null,
+        status: 'auto',
+        aliases: [],
+        sourceRecords: record.uuid ? [record.uuid] : []
+      });
     }
   }
 

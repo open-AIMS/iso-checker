@@ -42,13 +42,72 @@ async function checkIndOrcid(ind, party, record, context) {
             });
         }
         else {
-            results.push({
-                id: 'orcid-missing',
-                name: 'ORCID present',
-                severity: 'warning',
-                message: `No ORCID found for "${entityLabel}". ISO 19139 only supports ORCID in onlineResource.`,
-                entity: entityLabel
-            });
+            const kbMatches = ind.name ? context.knowledgeBase.findAllPeopleByName(ind.name) : [];
+            const noOrcidConfirmed = kbMatches.some(m => m.status === 'no-orcid');
+            const withOrcid = kbMatches.filter(m => m.orcid);
+            const uniqueOrcids = [...new Set(withOrcid.map(m => m.orcid))];
+            if (noOrcidConfirmed) {
+                results.push({
+                    id: 'orcid-missing',
+                    name: 'ORCID present',
+                    severity: 'info',
+                    message: `Confirmed: no ORCID for "${entityLabel}".`,
+                    entity: entityLabel
+                });
+            }
+            else if (uniqueOrcids.length === 1) {
+                const match = withOrcid[0];
+                results.push({
+                    id: 'orcid-missing',
+                    name: 'ORCID present',
+                    severity: 'warning',
+                    message: `No ORCID found for "${entityLabel}". KB suggests ${match.orcid}${match.registeredName ? ` (${match.registeredName})` : ''}.`,
+                    entity: entityLabel,
+                    suggestion: `https://orcid.org/${match.orcid}`,
+                    link: `https://orcid.org/${match.orcid}`
+                });
+            }
+            else if (uniqueOrcids.length > 1) {
+                const options = withOrcid.map(m => `${m.orcid}${m.registeredName ? ` (${m.registeredName})` : ''}`).join(', ');
+                results.push({
+                    id: 'orcid-missing',
+                    name: 'ORCID present',
+                    severity: 'warning',
+                    message: `No ORCID found for "${entityLabel}". KB has conflicting ORCIDs: ${options}.`,
+                    entity: entityLabel
+                });
+            }
+            else {
+                // No exact KB match — try fuzzy match
+                const fuzzyMatches = ind.name ? context.knowledgeBase.fuzzyFindPeople(ind.name) : [];
+                const fuzzyWithOrcid = fuzzyMatches.filter(m => m.orcid);
+                if (fuzzyWithOrcid.length > 0) {
+                    const match = fuzzyWithOrcid[0];
+                    const actions = ind.name
+                        ? [{ label: `Add as alias of ${match.registeredName ?? match.name}`, actionId: 'add-alias-person', data: { alias: ind.name, orcid: match.orcid } }]
+                        : [];
+                    results.push({
+                        id: 'orcid-missing',
+                        name: 'ORCID present',
+                        severity: 'warning',
+                        message: `No ORCID found for "${entityLabel}". Possible KB match: ${match.orcid}${match.registeredName ? ` (${match.registeredName})` : ''}.`,
+                        entity: entityLabel,
+                        suggestion: `https://orcid.org/${match.orcid}`,
+                        link: `https://orcid.org/${match.orcid}`,
+                        actions: actions.length ? actions : undefined
+                    });
+                }
+                else {
+                    results.push({
+                        id: 'orcid-missing',
+                        name: 'ORCID present',
+                        severity: 'warning',
+                        message: `No ORCID found for "${entityLabel}". ISO 19139 only supports ORCID in onlineResource.`,
+                        entity: entityLabel,
+                        actions: ind.name ? [{ label: 'Confirm: no ORCID', actionId: 'confirm-no-orcid', data: { name: ind.name } }] : undefined
+                    });
+                }
+            }
         }
         return results;
     }
@@ -58,14 +117,76 @@ async function checkIndOrcid(ind, party, record, context) {
     const hasPartyId = !!partyIdOrcid;
     const hasOnline = !!onlineOrcid;
     if (!hasPartyId && !hasOnline) {
-        results.push({
-            id: 'orcid-missing',
-            name: 'ORCID present',
-            severity: 'warning',
-            message: `No ORCID found for "${entityLabel}".`,
-            entity: entityLabel,
-            fix: 'Add ORCID in both cit:partyIdentifier and cit:onlineResource if the person has one.'
-        });
+        const kbMatches = ind.name ? context.knowledgeBase.findAllPeopleByName(ind.name) : [];
+        const noOrcidConfirmed = kbMatches.some(m => m.status === 'no-orcid');
+        const withOrcid = kbMatches.filter(m => m.orcid);
+        const uniqueOrcids = [...new Set(withOrcid.map(m => m.orcid))];
+        if (noOrcidConfirmed) {
+            results.push({
+                id: 'orcid-missing',
+                name: 'ORCID present',
+                severity: 'info',
+                message: `Confirmed: no ORCID for "${entityLabel}".`,
+                entity: entityLabel
+            });
+        }
+        else if (uniqueOrcids.length === 1) {
+            const match = withOrcid[0];
+            results.push({
+                id: 'orcid-missing',
+                name: 'ORCID present',
+                severity: 'warning',
+                message: `No ORCID found for "${entityLabel}". KB suggests ${match.orcid}${match.registeredName ? ` (${match.registeredName})` : ''}.`,
+                entity: entityLabel,
+                fix: 'Add ORCID in both cit:partyIdentifier and cit:onlineResource.',
+                suggestion: `https://orcid.org/${match.orcid}`,
+                link: `https://orcid.org/${match.orcid}`
+            });
+        }
+        else if (uniqueOrcids.length > 1) {
+            const options = withOrcid.map(m => `${m.orcid}${m.registeredName ? ` (${m.registeredName})` : ''}`).join(', ');
+            results.push({
+                id: 'orcid-missing',
+                name: 'ORCID present',
+                severity: 'warning',
+                message: `No ORCID found for "${entityLabel}". KB has conflicting ORCIDs: ${options}.`,
+                entity: entityLabel,
+                fix: 'Add ORCID in both cit:partyIdentifier and cit:onlineResource.'
+            });
+        }
+        else {
+            // No exact KB match — try fuzzy match
+            const fuzzyMatches = ind.name ? context.knowledgeBase.fuzzyFindPeople(ind.name) : [];
+            const fuzzyWithOrcid = fuzzyMatches.filter(m => m.orcid);
+            if (fuzzyWithOrcid.length > 0) {
+                const match = fuzzyWithOrcid[0];
+                const actions = ind.name
+                    ? [{ label: `Add as alias of ${match.registeredName ?? match.name}`, actionId: 'add-alias-person', data: { alias: ind.name, orcid: match.orcid } }]
+                    : [];
+                results.push({
+                    id: 'orcid-missing',
+                    name: 'ORCID present',
+                    severity: 'warning',
+                    message: `No ORCID found for "${entityLabel}". Possible KB match: ${match.orcid}${match.registeredName ? ` (${match.registeredName})` : ''}.`,
+                    entity: entityLabel,
+                    fix: 'Add ORCID in both cit:partyIdentifier and cit:onlineResource.',
+                    suggestion: `https://orcid.org/${match.orcid}`,
+                    link: `https://orcid.org/${match.orcid}`,
+                    actions: actions.length ? actions : undefined
+                });
+            }
+            else {
+                results.push({
+                    id: 'orcid-missing',
+                    name: 'ORCID present',
+                    severity: 'warning',
+                    message: `No ORCID found for "${entityLabel}".`,
+                    entity: entityLabel,
+                    fix: 'Add ORCID in both cit:partyIdentifier and cit:onlineResource if the person has one.',
+                    actions: ind.name ? [{ label: 'Confirm: no ORCID', actionId: 'confirm-no-orcid', data: { name: ind.name } }] : undefined
+                });
+            }
+        }
         return results;
     }
     // Inconsistency check
@@ -206,7 +327,35 @@ async function checkIndOrcid(ind, party, record, context) {
                         });
                     }
                 }
+                // Populate knowledge base
+                const synthesised = result.familyName
+                    ? `${result.familyName}, ${result.givenNames ?? ''}`.trim()
+                    : null;
+                const kbName = synthesised ?? ind.name ?? code;
+                const aliases = [];
+                if (ind.name && synthesised && ind.name !== synthesised) {
+                    aliases.push(ind.name);
+                }
+                context.knowledgeBase.addOrUpdatePerson({
+                    name: kbName,
+                    orcid: code,
+                    registeredName: synthesised,
+                    status: 'auto',
+                    aliases,
+                    sourceRecords: record.uuid ? [record.uuid] : []
+                });
             }
+        }
+        else if (code && !code.startsWith('http')) {
+            // API disabled but ORCID present — populate KB without registered name
+            context.knowledgeBase.addOrUpdatePerson({
+                name: ind.name ?? code,
+                orcid: code,
+                registeredName: null,
+                status: 'auto',
+                aliases: [],
+                sourceRecords: record.uuid ? [record.uuid] : []
+            });
         }
     }
     return results;

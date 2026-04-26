@@ -308,7 +308,7 @@ The knowledge base is populated automatically from analysed records and PID API 
 
 ### 11.2. How aliases accumulate
 
-Aliases are learned by observation only. When the same identifier (ROR or ORCID) appears with different name strings across records, the variations become aliases. The tool does not guess associations based on fuzzy string matching — a name is only associated with an identifier when both appear together in the same record.
+Aliases are learned by observation and user confirmation. When the same identifier (ROR or ORCID) appears with different name strings across records, the variations become aliases automatically. Users can also add aliases manually via [Add as alias] buttons that appear when the tool finds a near-match (see §11.3).
 
 When a PID API canonical name is available, it becomes the primary name. All other name strings for that identifier are aliases. When no canonical name is available (API validation disabled or identifier not yet resolved), the most frequently encountered name string is used as the primary name.
 
@@ -317,6 +317,7 @@ When a PID API canonical name is available, it becomes the primary name. All oth
 During record analysis, the knowledge base provides suggestions:
 
 - **Known identifier:** If a name (exact or known alias) matches an entry with a known ORCID/ROR, suggest it with a [Copy] button and the source record it was learned from.
+- **Near-match suggestion:** If no exact or alias match exists, the tool checks for near-matches using substring/containment matching (e.g. "Australian Institute of Marine Science (AIMS)" would near-match the KB entry "Australian Institute of Marine Science"). Near-matches are shown as suggestions with an [Add as alias] button. Clicking the button adds the name as an alias of the matched KB entry, so all future records with the same name string match automatically.
 - **Name conflict:** If a name matches multiple entries with different identifiers, show all possibilities with a caution that they may be different people/organisations.
 - **No-identifier confirmation:** If a user has confirmed "no ORCID" or "no ROR" for a name, suppress the warning for that entity across all records.
 
@@ -329,6 +330,8 @@ During record analysis, the knowledge base provides suggestions:
 ### 11.5. Import/export
 
 - CSV import/export for people (`name, orcid, status, aliases`) and organisations (`name, ror, status, aliases`). Aliases are pipe-separated. Import is lossless — exported CSV can be re-imported to restore the knowledge base.
+- CSV import is available separately for people and organisations, accessible from the knowledge base editor (not the main settings panel). Import supports two modes: **Replace** (clears all existing entries of that type, then imports) and **Merge** (imports row by row; if a name matches an existing entry, the imported row overwrites it).
+- The CSV format is the same for import and export. This means teams can export their knowledge base, share the CSV, and another team member can import it. It also supports the workflow of preparing a list of people without ORCIDs or organisations without RORs in a spreadsheet, exporting to CSV, and importing into the tool.
 - JSON download/upload of full local storage settings (includes knowledge base, settings, cache) for team sharing.
 
 ## 12. Settings
@@ -341,7 +344,7 @@ Stored in local storage. Includes:
 - **Rate limit:** Delay between requests, configurable from 0.5 to 2 seconds (default 0.5)
 - **Search results page size:** Number of records per page in CSW search results (25, 50, 100, 250, 500; default 25)
 - **PID cache:** Viewable, clearable. Stores API resolution results including canonical/registered names.
-- **Knowledge base:** People and org entries with view/edit, import/export CSV, clear all
+- **Knowledge base:** People and org entries with view/edit, clear all. CSV import/export is accessed from the knowledge base editor (see §11.5).
 - **All settings exportable/importable** as JSON for team sharing
 
 ### 12.1. Catalogue connection diagnostic (v1)
@@ -425,7 +428,7 @@ The proxy URL (`http://localhost:8080`) is stored per-catalogue in the tool's se
 
 ## 15. Version plan
 
-### v1 — Single record checker
+### v1 — Single record checker - COMPLETE
 
 - First-time setup: catalogue URL configuration with connection diagnostic
 - URL input with auto-conversion (GeoNetwork XML, human, and search URLs)
@@ -440,7 +443,7 @@ The proxy URL (`http://localhost:8080`) is stored per-catalogue in the tool's se
 - Settings: rule sections, API toggle, rate limit, PID cache, catalogue management
 - Implement proxy.py
 
-### v2 — Batch mode and multi-record workflow
+### v2 — Batch mode and multi-record workflow - COMPLETE
 
 - Batch mode via CSW GetRecords (search URL parsing, UUID list, manual search)
 - Rate limiting (default 0.5 sec delay, configurable 0.5–2 sec) and record cap (default 500)

@@ -206,9 +206,8 @@ Opens as a slide-in panel from the right edge. The user stays in context with th
 
 - Summary: People count (with ORCID / confirmed no ORCID / conflicts), Org count (with ROR / confirmed no ROR)
 - [View / Edit] — opens the knowledge base editor (see §7)
-- [Import CSV] / [Export CSV]
 - [Clear entire knowledge base] with confirmation
-- Description: "Built automatically from analysed records and PID API lookups. Use View/Edit to review entries and delete incorrect ones."
+- Description: "Built automatically from analysed records and PID API lookups. Use View/Edit to review, import, export, and delete entries."
 
 ### 6.8. Settings import/export
 
@@ -229,7 +228,14 @@ Opened from Settings → Knowledge Base → [View / Edit]. Displayed as a modal 
 
 - Introductory text: "The knowledge base is built automatically from analysed records and PID API lookups. Use this screen to review entries and delete incorrect ones."
 - Two tabs: **People** and **Organisations**, each showing entry count
-- Search field to filter entries
+- **Import/Export buttons** below the tabs, context-sensitive to the active tab:
+  - [Export CSV] — downloads the current tab's data as CSV
+  - [Import CSV] — opens a file picker, then prompts for import mode:
+    - **Replace** — clears all existing entries of that type (people or orgs), then imports. Shows a confirmation warning before proceeding.
+    - **Merge** — imports row by row. If a name matches an existing entry, the imported row overwrites it.
+  - Expandable "CSV format" instructions section (collapsed by default) showing the expected format and a two-row example (see §7.4)
+- **Filter toggles**: "Show: All / With ID / Confirmed no ID" — filters the table by status. Active filter is reflected in the visible entry count.
+- Search field to filter entries by name or alias substring
 - Table with columns:
 
 **People tab:**
@@ -250,7 +256,6 @@ Opened from Settings → Knowledge Base → [View / Edit]. Displayed as a modal 
 
 - Conflict rows are marked with a warning icon and explanatory text (e.g. "Possible conflict: same name, different ORCID")
 - [Clear all] button per tab, with confirmation
-- [Import CSV] / [Export CSV] buttons
 
 ### 7.3. Primary name selection
 
@@ -260,16 +265,38 @@ When multiple name strings share the same identifier, the primary name is set to
 
 ### 7.4. CSV format
 
-Import and export use the same format. Import is lossless — exported CSV can be re-imported to restore the knowledge base.
+Import and export use the same format. Import is lossless — exported CSV can be re-imported to restore the knowledge base. The same format supports bulk upload of people without ORCIDs or organisations without RORs from external spreadsheets.
 
 **People:** `name, orcid, status, aliases`
-- `name`: Primary name
+- `name`: Primary name (LastName, FirstName format to match metadata records)
 - `orcid`: ORCID string or empty
-- `status`: `auto`, `no-orcid`
-- `aliases`: Pipe-separated list (e.g. `Lawrey, E.P.|E. Lawrey`)
+- `status`: `auto` (learned from analysed records or imported with a known identifier) or `no-orcid` (confirmed this person has no ORCID)
+- `aliases`: Pipe-separated list of alternative name strings for the same person, or empty. Use `|` to separate multiple aliases.
+
+Example (shown in the expandable instructions):
+```
+name,orcid,status,aliases
+"Davis, Aaron",0000-0002-8278-9599,auto,
+"Bon, Aaron",,no-orcid,
+"Lawrey, Eric",0000-0002-1234-5678,auto,Lawrey, E.P.
+"Smith, Jane",0000-0001-9876-5432,auto,Smith, J.|Smith, Jane A.
+```
 
 **Organisations:** `name, ror, status, aliases`
-- Same structure as people
+- `name`: Organisation name (as it appears in metadata records)
+- `ror`: ROR ID or empty
+- `status`: `auto` (learned from analysed records or imported with a known identifier) or `no-ror` (confirmed this organisation has no ROR)
+- `aliases`: Pipe-separated list of alternative name strings for the same organisation, or empty
+
+Example:
+```
+name,ror,status,aliases
+"Australian Institute of Marine Science",03x57gn41,auto,AIMS
+"Aerial Architecture",,no-ror,
+"James Cook University",04gsp2c11,auto,JCU|TropWATER, James Cook University
+```
+
+The `orcid`/`ror` and `aliases` fields may be empty. For a no-identifier import list, only `name` and `status` are required (with empty identifier and aliases columns).
 
 ## 8. Markdown report export
 
@@ -329,7 +356,9 @@ Record XML loaded
      ├─ For each organisation WITHOUT a ROR:
      │    ├─ Look up name in knowledge base (exact match or known alias)
      │    ├─ If known alias for a ROR → suggest ROR + canonical name
-     │    ├─ If unknown → standard "no ROR" warning
+     │    ├─ If no exact match → fuzzy search (substring/containment)
+     │    │  ├─ If near-match found → suggest with [Add as alias] button
+     │    │  └─ If no near-match → standard "no ROR" warning
      │    └─ If confirmed "no ROR" in knowledge base → suppress warning
      │
      ├─ For each person with an ORCID in the record:
@@ -348,7 +377,9 @@ Record XML loaded
      │    ├─ If exact match with one known ORCID → suggest it
      │    ├─ If name matches but multiple ORCIDs → warn about conflict
      │    ├─ If known alias for an ORCID → suggest it (note alias)
-     │    ├─ If unknown → standard "no ORCID" warning
+     │    ├─ If no exact match → fuzzy search (substring/containment)
+     │    │  ├─ If near-match found → suggest with [Add as alias] button
+     │    │  └─ If no near-match → standard "no ORCID" warning
      │    └─ If confirmed "no ORCID" in knowledge base → suppress warning
      │
      ├─ Run DOI checks
@@ -368,7 +399,7 @@ Aliases are learned by observation, not data entry. The rules:
 
 2. **Canonical names are the "truth".** The primary name for a knowledge base entry is always the PID API canonical name when available (ROR display name, ORCID family+given). All other name strings associated with that identifier are aliases.
 
-3. **No fuzzy matching.** The tool does not guess associations based on string similarity. A name is only associated with an identifier when both appear together in the same record. This prevents false associations.
+3. **Near-match as fallback.** When no exact or alias match exists, the tool checks for near-matches using substring/containment matching (one string contains the other, case-insensitive). Near-matches are shown as suggestions with an [Add as alias] button rather than being treated as automatic associations. The user confirms the match before it is stored, preventing false associations. A name is automatically associated with an identifier only when both appear together in the same record.
 
 4. **Alias suggestions are advisory.** When a record contains a name that matches a known alias, the tool suggests the associated identifier. The user decides whether the suggestion applies — it may be a genuine match or a coincidental name overlap.
 
