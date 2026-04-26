@@ -41,6 +41,29 @@ body {
   color: #1a5276;
 }
 
+.header-version {
+  font-size: 12px;
+  font-weight: 400;
+  color: #888;
+}
+
+.header-links {
+  display: flex;
+  gap: 16px;
+  margin-left: auto;
+  margin-right: 16px;
+}
+
+.header-links a {
+  color: #2471a3;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.header-links a:hover {
+  text-decoration: underline;
+}
+
 /* --- Buttons --- */
 
 .btn {

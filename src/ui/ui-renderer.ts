@@ -8,6 +8,7 @@ import type {
 import { getAllSections } from '../rules/rule-registry.js';
 import { generateMarkdownReport, generateAiContextReport, copyToClipboard } from './report-export.js';
 import { CatalogueClient, type ConnectionTestResult } from '../catalogue/catalogue-client.js';
+import { APP_VERSION } from '../version.js';
 import { loadSettings, saveSettings } from '../storage/settings.js';
 
 const SEVERITY_CLASSES: Record<Severity, string> = {
@@ -140,7 +141,11 @@ export function renderMainInterface(
   // Header
   const header = el('header', 'header-bar');
   header.innerHTML = `
-    <h1>ISO 19115-3 Metadata Checker</h1>
+    <h1>ISO 19115-3 Metadata Checker <span class="header-version">v${APP_VERSION}</span></h1>
+    <nav class="header-links">
+      <a href="https://github.com/open-AIMS/iso-checker/blob/main/faq.md" target="_blank" rel="noopener">FAQ</a>
+      <a href="https://github.com/open-AIMS/iso-checker/blob/main/community-guide.md" target="_blank" rel="noopener">Community Guide</a>
+    </nav>
     <button id="settings-btn" class="btn btn-icon" title="Settings">⚙ Settings</button>
   `;
   container.appendChild(header);
