@@ -24,6 +24,14 @@ The tool validates records against the Community Practice Guide conventions:
 
 External PID resolution (DOI, ORCID, ROR, RAiD) is enabled by default and can be toggled off in settings. Results are cached locally to avoid repeated API calls.
 
+### Knowledge base
+
+The tool automatically builds a knowledge base of people and organisations as it analyses records. When the same ORCID or ROR appears with different name variations across records, the tool learns these as aliases and can suggest known identifiers for names it recognises in new records.
+
+The knowledge base also tracks people and organisations that have been confirmed as not having an ORCID or ROR. Once flagged, the missing-identifier warning is suppressed for that person or organisation across all future records. Confirmations can be made interactively during review, or by importing a prepared CSV file listing names and their status — useful for pre-populating the knowledge base for a team or catalogue.
+
+The knowledge base is stored in the browser's local storage and can be exported and shared between team members as CSV (for people and organisations separately) or as a full JSON settings export.
+
 ## How it works
 
 The tool runs entirely in the browser. It fetches ISO 19115-3 XML records from any GeoNetwork 3.x or 4.x catalogue via the standard XML API (`/srv/api/records/{uuid}/formatters/xml`), parses the XML and runs validation checks against it. No data is sent to any server other than the catalogue being checked and the PID resolution APIs.
@@ -119,11 +127,6 @@ npm run build
 
 Compiles TypeScript from `src/` to JavaScript in `dist/`. Source maps are generated for local debugging but excluded from git via `.gitignore`.
 
-**Watch mode** (recompiles on file changes):
-
-```
-npm run watch
-```
 
 **Run locally:**
 
