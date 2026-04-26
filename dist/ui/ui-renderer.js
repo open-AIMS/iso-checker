@@ -231,7 +231,7 @@ export function renderMainInterface(container, app) {
     });
 }
 // --- Record report rendering ---
-export function renderRecordReport(container, report, condensedGuide) {
+export function renderRecordReport(container, report, condensedGuide, onRecheck) {
     container.innerHTML = '';
     // Record header
     const header = el('div', 'record-header');
@@ -260,6 +260,7 @@ export function renderRecordReport(container, report, condensedGuide) {
       <span class="count-info">${SEVERITY_ICONS.info} ${counts.info} info</span>
     </div>
     <div class="summary-actions">
+      ${report.record.sourceUrl && onRecheck ? '<button class="btn btn-small btn-recheck">Re-check</button>' : ''}
       <div class="copy-dropdown">
         <button class="btn btn-small btn-copy-main">Copy report ▾</button>
         <div class="copy-dropdown-menu" style="display:none">
@@ -305,6 +306,23 @@ export function renderRecordReport(container, report, condensedGuide) {
         copyMenu.style.display = 'none';
         showToast('Report copied to clipboard');
     });
+    // Re-check button handler
+    if (report.record.sourceUrl && onRecheck) {
+        const recheckBtn = summaryBar.querySelector('.btn-recheck');
+        recheckBtn.addEventListener('click', async () => {
+            recheckBtn.disabled = true;
+            recheckBtn.textContent = 'Checking\u2026';
+            try {
+                await onRecheck();
+            }
+            catch (e) {
+                console.error('Re-check failed:', e);
+                showToast('Re-check failed');
+                recheckBtn.disabled = false;
+                recheckBtn.textContent = 'Re-check';
+            }
+        });
+    }
     // Schema warning for ISO 19139
     if (report.record.schema === 'iso19139') {
         const warning = el('div', 'schema-warning');
@@ -731,7 +749,7 @@ export function getSelectedBatchUuids(_container) {
     return Array.from(batchSelectedUuids);
 }
 // --- Batch report view ---
-export function renderBatchReport(container, reports, condensedGuide, onSelect) {
+export function renderBatchReport(container, reports, condensedGuide, onRecheck) {
     container.innerHTML = '';
     container.className = 'batch-layout';
     // Left panel
@@ -786,9 +804,66 @@ export function renderBatchReport(container, reports, condensedGuide, onSelect) 
         row.addEventListener('click', () => {
             list.querySelectorAll('.batch-record-row').forEach(r => r.classList.remove('active'));
             row.classList.add('active');
-            onSelect(i);
+            renderSelectedRecord(i);
         });
         list.appendChild(row);
+    }
+    // Render the selected record in the right panel, with recheck support
+    let selectedIndex = 0;
+    function renderSelectedRecord(index) {
+        selectedIndex = index;
+        const recheckCb = onRecheck ? async () => {
+            await onRecheck(index);
+            refreshBatchUi(index);
+            renderSelectedRecord(index);
+        } : undefined;
+        renderRecordReport(right, reports[index], condensedGuide, recheckCb);
+    }
+    // Update left panel after a recheck
+    function refreshBatchUi(index) {
+        // Recalculate the row severity
+        const newWorst = getWorstSeverityForReport(reports[index]);
+        const newCategory = newWorst === 'error' ? 'error' : newWorst === 'warning' ? 'warning' : 'pass';
+        reportSeverities[index] = newCategory;
+        const row = list.querySelector(`[data-index="${index}"]`);
+        if (row) {
+            row.className = `batch-record-row ${SEVERITY_CLASSES[newWorst]} active`;
+            row.dataset.severity = newCategory;
+            row.querySelector('.check-icon').textContent = SEVERITY_ICONS[newWorst];
+        }
+        // Recalculate all counts from reports
+        const newTotalCounts = { pass: 0, warning: 0, error: 0, info: 0 };
+        for (const r of reports) {
+            const c = countSeverities(r.sections);
+            newTotalCounts.pass += c.pass;
+            newTotalCounts.warning += c.warning;
+            newTotalCounts.error += c.error;
+            newTotalCounts.info += c.info;
+        }
+        const newRecordCounts = { pass: 0, warning: 0, error: 0 };
+        for (let j = 0; j < reports.length; j++) {
+            const w = getWorstSeverityForReport(reports[j]);
+            const cat = w === 'error' ? 'error' : w === 'warning' ? 'warning' : 'pass';
+            reportSeverities[j] = cat;
+            newRecordCounts[cat]++;
+        }
+        // Update header counts
+        const header = left.querySelector('.batch-summary-header');
+        const testCounts = header.querySelector('.summary-counts');
+        testCounts.innerHTML = `
+      Tests: <span class="count-pass">${SEVERITY_ICONS.pass} ${newTotalCounts.pass}</span>
+      <span class="count-warning">${SEVERITY_ICONS.warning} ${newTotalCounts.warning}</span>
+      <span class="count-error">${SEVERITY_ICONS.error} ${newTotalCounts.error}</span>
+    `;
+        // Update record filter count labels (preserve checkbox state)
+        const filterLabels = header.querySelectorAll('.filter-checkbox');
+        filterLabels.forEach(label => {
+            const cb = label.querySelector('input');
+            const filter = cb.dataset.filter;
+            const span = label.querySelector('span');
+            span.className = `count-${filter}`;
+            span.textContent = `${SEVERITY_ICONS[filter]} ${newRecordCounts[filter]}`;
+        });
     }
     // Filter checkboxes — toggle record visibility by severity
     const filterCheckboxes = left.querySelectorAll('.record-filter-counts input[type="checkbox"]');
@@ -814,7 +889,7 @@ export function renderBatchReport(container, reports, condensedGuide, onSelect) 
                 for (const row of Array.from(rows)) {
                     if (row.style.display !== 'none') {
                         row.classList.add('active');
-                        onSelect(parseInt(row.dataset.index, 10));
+                        renderSelectedRecord(parseInt(row.dataset.index, 10));
                         break;
                     }
                 }
@@ -825,7 +900,7 @@ export function renderBatchReport(container, reports, condensedGuide, onSelect) 
     container.appendChild(right);
     // Show first report
     if (reports.length > 0) {
-        renderRecordReport(right, reports[0], condensedGuide);
+        renderSelectedRecord(0);
         list.querySelector('.batch-record-row')?.classList.add('active');
     }
 }

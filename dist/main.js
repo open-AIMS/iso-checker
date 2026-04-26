@@ -200,10 +200,16 @@ function showMainInterface(root) {
                 resultsArea.innerHTML = '<p class="error-msg">No records could be processed.</p>';
                 return;
             }
-            renderBatchReport(resultsArea, reports, condensedGuide, (index) => {
-                const rightPanel = resultsArea.querySelector('.batch-right-panel');
-                if (rightPanel)
-                    renderRecordReport(rightPanel, reports[index], condensedGuide);
+            renderBatchReport(resultsArea, reports, condensedGuide, async (index) => {
+                const uuid = reports[index].record.uuid;
+                if (!uuid)
+                    return;
+                const xmlText = await client.fetchRecord(uuid);
+                const doc = parseXml(xmlText);
+                const sourceUrl = buildCataloguePageUrl(cat.url, uuid);
+                const record = parseRecord(doc, sourceUrl);
+                const report = await analyseRecord(record, buildCheckContext());
+                reports[index] = report;
             });
         },
         toggleSettings() {
