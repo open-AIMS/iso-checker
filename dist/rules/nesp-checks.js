@@ -1,9 +1,9 @@
 // NESP MaC Conventions — requirements.md §7
 // Optional profile: title patterns and standard online resources
 // Project: "{Program} Project {Code} - {Title} ({Orgs})"
-const PROJECT_TITLE_PATTERN = /^.+\s+Project\s+\d+\.\d+\s*[-–]\s+.+\s*\(.+\)$/;
+const PROJECT_TITLE_PATTERN = /^.+\s+Project\s+\d+(?:\.\d+)+\s*[-–]\s+.+\s*\(.+\)$/;
 // Dataset: "{Title} ({Program} {Code}, {Orgs})"
-const DATASET_TITLE_PATTERN = /^.+\s*\([A-Z][\w\s]+\d+\.\d+,\s*.+\)$/;
+const DATASET_TITLE_PATTERN = /^.+\s*\([A-Z][\w\s]+\d+(?:\.\d+)+,\s*.+\)$/;
 export const nespChecks = {
     id: 'nesp',
     name: 'NESP MaC Conventions',

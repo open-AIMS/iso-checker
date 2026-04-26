@@ -4,10 +4,10 @@
 import type { RuleSection, CheckResult, ParsedRecord, CheckContext } from '../types.js';
 
 // Project: "{Program} Project {Code} - {Title} ({Orgs})"
-const PROJECT_TITLE_PATTERN = /^.+\s+Project\s+\d+\.\d+\s*[-–]\s+.+\s*\(.+\)$/;
+const PROJECT_TITLE_PATTERN = /^.+\s+Project\s+\d+(?:\.\d+)+\s*[-–]\s+.+\s*\(.+\)$/;
 
 // Dataset: "{Title} ({Program} {Code}, {Orgs})"
-const DATASET_TITLE_PATTERN = /^.+\s*\([A-Z][\w\s]+\d+\.\d+,\s*.+\)$/;
+const DATASET_TITLE_PATTERN = /^.+\s*\([A-Z][\w\s]+\d+(?:\.\d+)+,\s*.+\)$/;
 
 export const nespChecks: RuleSection = {
   id: 'nesp',
